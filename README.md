@@ -401,12 +401,25 @@ The analytics pipeline produces:
 
 ### Sample Insights
 
+The analytics pipeline generates categorized, severity-ranked insights — each with a specific recommended action:
+
 ```
-- HOSP_B: Mohs surgery shows high duration variance (σ=79.4 min). Staffing adjustment may help.
-- HOSP_B: Endometrial ablation has 100% late start rate (>15 min past scheduled). Scheduling review recommended.
-- HOSP_A: 385 completed cases, avg total time 77 min
-- Overall cancellation rate: 1.8% (18/1007)
+[HIGH]  HOSP_A: "PACU to Discharge" phase accounts for 42% of total patient time (40 min avg).
+        → Investigate PACU-to-discharge workflows. Target reduction of this phase by 10-15% to improve throughput.
+
+[HIGH]  HOSP_B: ACL reconstruction has unpredictable duration (σ=68 min, CV=52%).
+        → Review case mix and surgeon variability. Consider dedicated block scheduling with buffer time.
+
+[MED]   HOSP_B: Rotator cuff repair runs 25 min slower (34%) than HOSP_A (99 vs 74 min).
+        → Benchmark HOSP_B protocols against HOSP_A to identify transferable practices.
+
+[MED]   Overall cancellation rate: 2.4% (312/12,977).
+        → Review top cancellation reasons. Target root causes (no-shows, incomplete pre-op clearance).
+
+[INFO]  HOSP_A: 4,609 completed cases. Average total time 96 min (p90: 153 min).
 ```
+
+Insight categories include **Workflow Bottlenecks**, **Duration Variability Alerts**, **Scheduling Delays**, **Cross-Facility Comparisons**, **Cancellation Analysis**, and **Facility Overviews**.
 
 ### ML Model Performance
 
@@ -414,9 +427,31 @@ The analytics pipeline produces:
 |---------------------------|--------|--------|---------|
 | Discharge Time Predictor  | MAE    | ~12 min | XGBoost |
 | Discharge Time Predictor  | R²     | ~0.87   | XGBoost |
-| Extended Recovery Classifier | AUC  | ~0.86   | XGBoost |
+| Extended Recovery Classifier | AUC  | ~0.92   | XGBoost |
 
 GPU acceleration via RAPIDS cuDF/cuML is used automatically when available; otherwise CPU fallback is seamless.
+
+### Understanding the Model Metrics
+
+The analytics pipeline uses three complementary metrics to evaluate model quality. Each was chosen for its interpretability in a healthcare operations context.
+
+#### MAE — Mean Absolute Error (Discharge Time Predictor)
+
+MAE measures the average magnitude of prediction errors in the same unit as the target variable (minutes). A MAE of ~12 minutes means the model's discharge time estimate is, on average, within 12 minutes of the actual discharge time.
+
+**Why MAE**: Unlike squared-error metrics (MSE, RMSE), MAE treats all errors equally and is not disproportionately affected by outliers. In outpatient scheduling, a 30-minute miss is roughly twice as disruptive as a 15-minute miss — MAE reflects this linear cost directly. This makes it easy for operations staff to reason about: *"Our predictions are accurate to within about 12 minutes."*
+
+#### R² — Coefficient of Determination (Discharge Time Predictor)
+
+R² measures the proportion of variance in actual discharge times that the model explains. An R² of 0.87 means the model captures 87% of the variability in patient flow timing; the remaining 13% is due to factors not captured in the input features (e.g., unexpected complications, staffing changes).
+
+**Why R²**: R² provides a normalized 0-to-1 scale (where 1.0 is a perfect predictor) that is independent of the unit of measurement. It complements MAE by answering a different question — MAE says *how far off* predictions are, while R² says *how much of the pattern* the model has learned. Together, a high R² with a low MAE confirms the model is both directionally correct and practically useful.
+
+#### AUC — Area Under the ROC Curve (Extended Recovery Classifier)
+
+AUC measures the binary classifier's ability to distinguish patients who will have extended recovery (above the 90th percentile threshold) from those who will not. An AUC of 0.92 means that if you randomly select one extended-recovery patient and one normal-recovery patient, the model correctly ranks the extended-recovery patient as higher risk 92% of the time.
+
+**Why AUC**: Extended recovery is a rare event (only ~10% of cases exceed the p90 threshold). Accuracy alone would be misleading — a model that always predicts "normal recovery" would be 90% accurate but operationally useless. AUC evaluates discrimination ability across all possible classification thresholds, making it robust for imbalanced classes. This is critical in healthcare operations where correctly identifying the 10% of high-risk cases enables proactive resource allocation (PACU bed planning, staff availability, family communication).
 
 ## Project Structure
 

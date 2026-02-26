@@ -268,67 +268,175 @@ def train_extended_recovery_classifier(df: pd.DataFrame, feature_cols: List[str]
 
 
 def generate_insights(df: pd.DataFrame, aggs: pd.DataFrame) -> List[Dict]:
-    """Generate actionable insights from the analysis."""
+    """Generate actionable insights from the analysis.
+
+    Each insight includes:
+      - type: category key
+      - severity: "high" | "medium" | "info"
+      - message: human-readable summary
+      - action: specific recommended next step
+    """
     insights = []
 
-    # 1. Highest variance procedures
+    # ---- 1. High-variance procedures (operational risk) ----
     if "dur_total_std" in aggs.columns:
         high_var = aggs.nlargest(5, "dur_total_std")
         for _, row in high_var.iterrows():
+            std = row["dur_total_std"]
+            mean = row.get("dur_total_mean", 0)
+            cv = (std / mean * 100) if mean > 0 else 0
+            severity = "high" if cv > 50 else "medium"
             insights.append({
                 "type": "high_variance",
+                "severity": severity,
                 "facility": row["facility_id"],
                 "procedure": row["procedure_type"],
-                "total_duration_std": round(row["dur_total_std"], 1),
+                "total_duration_std": round(std, 1),
+                "coefficient_of_variation": round(cv, 1),
                 "message": (
-                    f"{row['facility_id']}: {row['procedure_type']} shows high duration variance "
-                    f"(σ={row['dur_total_std']:.1f} min). Staffing adjustment may help."
+                    f"{row['facility_id']}: {row['procedure_type']} has unpredictable "
+                    f"duration (σ={std:.0f} min, CV={cv:.0f}%). "
+                    f"Mean {mean:.0f} min but p90 {row.get('dur_total_p90', 0):.0f} min."
+                ),
+                "action": (
+                    "Review case mix and surgeon variability. Consider dedicated block "
+                    "scheduling with buffer time to absorb outliers."
                 ),
             })
 
-    # 2. Highest late start rates
+    # ---- 2. Late start rates (scheduling inefficiency) ----
     if "late_start_rate" in aggs.columns:
         late = aggs[aggs["late_start_rate"] > 0.2].nlargest(5, "late_start_rate")
         for _, row in late.iterrows():
+            rate = row["late_start_rate"]
+            severity = "high" if rate > 0.5 else "medium"
             insights.append({
                 "type": "late_starts",
+                "severity": severity,
                 "facility": row["facility_id"],
                 "procedure": row["procedure_type"],
-                "late_start_rate": round(row["late_start_rate"], 3),
+                "late_start_rate": round(rate, 3),
                 "message": (
-                    f"{row['facility_id']}: {row['procedure_type']} has {row['late_start_rate']:.0%} "
-                    f"late start rate (>15 min past scheduled). Scheduling review recommended."
+                    f"{row['facility_id']}: {row['procedure_type']} starts late "
+                    f"{rate:.0%} of the time (>15 min past scheduled)."
+                ),
+                "action": (
+                    "Audit pre-op preparation workflow. Verify patient arrival "
+                    "instructions and pre-op lab turnaround times."
                 ),
             })
 
-    # 3. Facility-level summary
+    # ---- 3. Bottleneck phase detection ----
+    phase_cols = {
+        "dur_checkin_to_preop_mean": "Check-in to Pre-op",
+        "dur_preop_to_op_mean": "Pre-op to OR",
+        "dur_op_to_postop_mean": "OR to PACU",
+        "dur_postop_to_discharge_mean": "PACU to Discharge",
+    }
+    available_phases = [c for c in phase_cols if c in aggs.columns]
+    if available_phases:
+        for fac in aggs["facility_id"].unique():
+            fac_aggs = aggs[aggs["facility_id"] == fac]
+            phase_means = {c: fac_aggs[c].mean() for c in available_phases}
+            total = sum(phase_means.values())
+            if total > 0:
+                worst_col = max(phase_means, key=phase_means.get)
+                worst_val = phase_means[worst_col]
+                pct = worst_val / total * 100
+                if pct > 35:
+                    insights.append({
+                        "type": "bottleneck",
+                        "severity": "high" if pct > 45 else "medium",
+                        "facility": fac,
+                        "phase": phase_cols[worst_col],
+                        "phase_minutes": round(worst_val, 1),
+                        "phase_pct": round(pct, 1),
+                        "message": (
+                            f"{fac}: \"{phase_cols[worst_col]}\" phase accounts for "
+                            f"{pct:.0f}% of total patient time ({worst_val:.0f} min avg)."
+                        ),
+                        "action": (
+                            f"Investigate {phase_cols[worst_col].lower()} workflows. "
+                            f"Target reduction of this phase by 10-15% to improve throughput."
+                        ),
+                    })
+
+    # ---- 4. Cross-facility comparison (best-practice gaps) ----
+    if len(aggs["facility_id"].unique()) > 1:
+        for proc in aggs["procedure_type"].unique():
+            proc_rows = aggs[aggs["procedure_type"] == proc]
+            if len(proc_rows) < 2:
+                continue
+            fastest = proc_rows.loc[proc_rows["dur_total_mean"].idxmin()]
+            slowest = proc_rows.loc[proc_rows["dur_total_mean"].idxmax()]
+            gap = slowest["dur_total_mean"] - fastest["dur_total_mean"]
+            if gap > 20 and fastest["dur_total_mean"] > 0:
+                gap_pct = gap / fastest["dur_total_mean"] * 100
+                if gap_pct > 30:
+                    insights.append({
+                        "type": "cross_facility",
+                        "severity": "medium",
+                        "facility": str(slowest["facility_id"]),
+                        "procedure": proc,
+                        "gap_minutes": round(gap, 1),
+                        "gap_pct": round(gap_pct, 1),
+                        "reference_facility": str(fastest["facility_id"]),
+                        "message": (
+                            f"{slowest['facility_id']}: {proc} runs {gap:.0f} min slower "
+                            f"({gap_pct:.0f}%) than {fastest['facility_id']} "
+                            f"({slowest['dur_total_mean']:.0f} vs {fastest['dur_total_mean']:.0f} min)."
+                        ),
+                        "action": (
+                            f"Benchmark {slowest['facility_id']} protocols against "
+                            f"{fastest['facility_id']} to identify transferable practices."
+                        ),
+                    })
+
+    # ---- 5. Facility-level summary ----
     completed = df[df["case_status"] == "completed"]
-    for fac in completed["facility_id"].unique():
+    for fac in sorted(completed["facility_id"].unique()):
         fac_data = completed[completed["facility_id"] == fac]
         avg_total = fac_data["dur_total"].mean()
+        p90_total = fac_data["dur_total"].quantile(0.9)
         vol = len(fac_data)
         insights.append({
             "type": "facility_summary",
+            "severity": "info",
             "facility": fac,
             "avg_total_minutes": round(avg_total, 1),
+            "p90_total_minutes": round(p90_total, 1),
             "total_cases": vol,
             "message": (
-                f"{fac}: {vol} completed cases, avg total time {avg_total:.0f} min"
+                f"{fac}: {vol:,} completed cases. "
+                f"Average total time {avg_total:.0f} min (p90: {p90_total:.0f} min)."
             ),
+            "action": "No action required — informational baseline.",
         })
 
-    # 4. Cancellation rate
+    # ---- 6. Cancellation rate ----
     total = len(df)
     canceled = len(df[df["case_status"] == "canceled"])
     if total > 0:
         cancel_rate = canceled / total
+        severity = "high" if cancel_rate > 0.05 else ("medium" if cancel_rate > 0.02 else "info")
         insights.append({
             "type": "cancellation_rate",
+            "severity": severity,
             "rate": round(cancel_rate, 4),
             "count": canceled,
             "total": total,
-            "message": f"Overall cancellation rate: {cancel_rate:.1%} ({canceled}/{total})",
+            "message": f"Overall cancellation rate: {cancel_rate:.1%} ({canceled:,}/{total:,}).",
+            "action": (
+                "Review top cancellation reasons. Target root causes "
+                "(patient no-shows, incomplete pre-op clearance, scheduling conflicts)."
+                if cancel_rate > 0.02 else
+                "Rate within acceptable range. Continue monitoring."
+            ),
         })
+
+    # Sort: high severity first, then medium, then info
+    severity_order = {"high": 0, "medium": 1, "info": 2}
+    insights.sort(key=lambda x: severity_order.get(x.get("severity", "info"), 2))
 
     logger.info("Generated %d insights", len(insights))
     return insights

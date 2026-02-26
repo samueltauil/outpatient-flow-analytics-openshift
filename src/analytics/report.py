@@ -135,6 +135,27 @@ tr:hover td{background:rgba(88,166,255,0.03)}
 .pill-late{background:rgba(248,81,73,0.12);color:var(--red)}
 .pill-summary{background:rgba(88,166,255,0.12);color:var(--blue)}
 .pill-cancel{background:rgba(167,139,250,0.12);color:var(--purple)}
+.pill-bottleneck{background:rgba(248,81,73,0.12);color:var(--red)}
+.pill-cross{background:rgba(240,136,62,0.12);color:var(--orange)}
+
+/* Insight cards */
+.insight-section{margin-bottom:40px}
+.insight-section h2{font-size:16px;font-weight:600;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.insight-section .section-desc{color:var(--muted);font-size:13px;margin-bottom:20px}
+.insight-group{margin-bottom:28px}
+.insight-group-title{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.insight-group-count{font-variant-numeric:tabular-nums;color:var(--text);background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1px 8px;font-size:11px}
+.insight-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:18px 20px;margin-bottom:10px;display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:start}
+.insight-card:hover{border-color:rgba(88,166,255,0.3)}
+.insight-severity{width:4px;border-radius:2px;min-height:48px;align-self:stretch}
+.sev-high{background:var(--red)}
+.sev-medium{background:var(--orange)}
+.sev-info{background:var(--blue)}
+.insight-body{}
+.insight-finding{font-size:13px;line-height:1.55;margin-bottom:8px}
+.insight-action{font-size:12px;color:var(--muted);line-height:1.5;padding:8px 12px;background:rgba(88,166,255,0.04);border-radius:4px;border-left:2px solid var(--border)}
+.insight-action strong{color:var(--text);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.4px}
+.insight-meta{display:flex;gap:10px;align-items:center;margin-bottom:6px}
 
 /* Model cards */
 .model-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
@@ -303,19 +324,58 @@ def build_report(results: Dict[str, Any], aggs: pd.DataFrame) -> str:
         </div>""")
     parts.append('</div></div>')
 
-    # Insights table
-    parts.append('<div class="section"><h2>Actionable Insights</h2><table>')
-    parts.append('<tr><th>Category</th><th>Facility</th><th>Detail</th></tr>')
-    pill_map = {"high_variance": "pill-variance", "late_starts": "pill-late",
-                "facility_summary": "pill-summary", "cancellation_rate": "pill-cancel"}
+    # Insights — categorized cards with severity + recommended actions
+    insight_groups = {
+        "bottleneck": {"title": "Workflow Bottlenecks", "pill": "pill-bottleneck"},
+        "high_variance": {"title": "Duration Variability Alerts", "pill": "pill-variance"},
+        "late_starts": {"title": "Scheduling Delays", "pill": "pill-late"},
+        "cross_facility": {"title": "Cross-Facility Comparisons", "pill": "pill-cross"},
+        "cancellation_rate": {"title": "Cancellation Analysis", "pill": "pill-cancel"},
+        "facility_summary": {"title": "Facility Overviews", "pill": "pill-summary"},
+    }
+    severity_label = {"high": "High Priority", "medium": "Review", "info": "Informational"}
+
+    n_actionable = sum(1 for i in insights if i.get("severity") in ("high", "medium"))
+    parts.append(f'<div class="insight-section">')
+    parts.append(f'<h2>Actionable Insights</h2>')
+    parts.append(f'<p class="section-desc">{len(insights)} findings identified across '
+                 f'{n_facilities} facilities — <strong>{n_actionable} require review</strong>. '
+                 f'Insights are ordered by severity. Each includes a recommended action.</p>')
+
+    grouped: Dict[str, list] = {}
     for ins in insights:
-        pclass = pill_map.get(ins["type"], "pill-summary")
-        label = ins["type"].replace("_", " ").title()
-        fac = ins.get("facility", "All")
-        msg = ins.get("message", "")
-        parts.append(f'<tr><td><span class="pill {pclass}">{html.escape(label)}</span></td>'
-                      f'<td>{html.escape(fac)}</td><td>{html.escape(msg)}</td></tr>')
-    parts.append('</table></div>')
+        grouped.setdefault(ins["type"], []).append(ins)
+
+    # Render groups in priority order
+    for gtype in ["bottleneck", "high_variance", "late_starts", "cross_facility",
+                   "cancellation_rate", "facility_summary"]:
+        items = grouped.get(gtype, [])
+        if not items:
+            continue
+        gmeta = insight_groups.get(gtype, {"title": gtype.replace("_", " ").title(), "pill": "pill-summary"})
+        parts.append(f'<div class="insight-group">')
+        parts.append(f'<div class="insight-group-title">'
+                     f'<span class="pill {gmeta["pill"]}">{html.escape(gmeta["title"])}</span>'
+                     f'<span class="insight-group-count">{len(items)}</span></div>')
+        for ins in items:
+            sev = ins.get("severity", "info")
+            fac = ins.get("facility", "All")
+            msg = ins.get("message", "")
+            action = ins.get("action", "")
+            parts.append(f'<div class="insight-card">'
+                         f'<div class="insight-severity sev-{sev}"></div>'
+                         f'<div class="insight-body">'
+                         f'<div class="insight-meta">'
+                         f'<span class="pill {gmeta["pill"]}">{html.escape(severity_label.get(sev, sev))}</span>'
+                         f'<span style="color:var(--muted);font-size:12px">{html.escape(fac)}</span>'
+                         f'</div>'
+                         f'<div class="insight-finding">{html.escape(msg)}</div>')
+            if action:
+                parts.append(f'<div class="insight-action">'
+                             f'<strong>Recommended action</strong><br/>{html.escape(action)}</div>')
+            parts.append('</div></div>')
+        parts.append('</div>')
+    parts.append('</div>')
 
     # Top procedures table
     parts.append('<div class="section"><h2>Top 20 Procedures by Volume</h2><table>')
