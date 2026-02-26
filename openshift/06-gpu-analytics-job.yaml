@@ -26,7 +26,7 @@ spec:
       restartPolicy: OnFailure
       containers:
       - name: analytics
-        image: ghcr.io/samueltauil/hls-analytics:latest
+        image: ghcr.io/samueltauil/hls-analytics-gpu:latest
         args:
         - "--input"
         - "postgresql://$(CENTRAL_DB_USER):$(CENTRAL_DB_PASSWORD)@central-postgres:5432/$(CENTRAL_DB_NAME)"

@@ -173,11 +173,13 @@ Pre-built images are published to GitHub Container Registry and used by the Open
 |:------|:------------|:--------------|
 | [`ghcr.io/samueltauil/hls-data-generator`](https://ghcr.io/samueltauil/hls-data-generator) | Synthetic data generator | `Containerfile.generator` |
 | [`ghcr.io/samueltauil/hls-etl-job`](https://ghcr.io/samueltauil/hls-etl-job) | ETL batch job | `Containerfile.etl` |
-| [`ghcr.io/samueltauil/hls-analytics`](https://ghcr.io/samueltauil/hls-analytics) | Analytics pipeline (CPU) | `Containerfile.analytics-cpu` |
+| [`ghcr.io/samueltauil/hls-analytics`](https://ghcr.io/samueltauil/hls-analytics) | Analytics pipeline (CPU fallback) | `Containerfile.analytics-cpu` |
+| [`ghcr.io/samueltauil/hls-analytics-gpu`](https://ghcr.io/samueltauil/hls-analytics-gpu) | **Analytics pipeline (RAPIDS + CUDA 12)** | `Containerfile.analytics` |
 
-> **GPU variant**: For GPU-accelerated analytics on the H100, rebuild the analytics image using
-> `Containerfile.analytics` (RAPIDS base). The CPU image works identically — the code auto-detects
-> GPU availability at runtime.
+> **GPU image**: `hls-analytics-gpu` is built from the NVIDIA RAPIDS 26.02 base image with cuDF,
+> cuML, and XGBoost GPU support pre-installed (~8 GB). The OpenShift GPU job manifest
+> (`06-gpu-analytics-job.yaml`) references this image. The CPU variant (`hls-analytics`) is a
+> lightweight fallback — the Python code auto-detects GPU availability at runtime.
 
 Images are automatically rebuilt on every push to `main` via GitHub Actions (`.github/workflows/build-images.yaml`).
 

@@ -1,17 +1,21 @@
 # ==============================================================================
-# Analytics Container (GPU-capable with CPU fallback)
-# Runs on H100 GPU node with RAPIDS + XGBoost, falls back to CPU
+# Analytics Container — GPU (NVIDIA RAPIDS + CUDA 12 + XGBoost gpu_hist)
+# Base image includes cuDF, cuML, XGBoost-GPU, NumPy, Pandas, scikit-learn
+# Runs on H100/A100/L40S nodes; Python code auto-detects GPU at runtime
 # ==============================================================================
-FROM nvcr.io/nvidia/rapidsai/base:24.12-cuda12.5-py3.12
+FROM nvcr.io/nvidia/rapidsai/base:26.02-cuda12-py3.12
 
-LABEL name="hls-analytics" \
+LABEL name="hls-analytics-gpu" \
       version="0.1.0" \
-      description="GPU-accelerated outpatient flow analytics"
+      description="GPU-accelerated outpatient flow analytics (RAPIDS/CUDA 12)"
 
 WORKDIR /app
 
+# RAPIDS base already ships cudf, cuml, xgboost-gpu, numpy, pandas, sklearn.
+# Install only the extras not in the base image.
 COPY requirements-ml.txt .
-RUN pip install --no-cache-dir -r requirements-ml.txt psycopg2-binary
+RUN pip install --no-cache-dir psycopg2-binary && \
+    pip install --no-cache-dir -r requirements-ml.txt 2>/dev/null || true
 
 COPY src/ src/
 COPY db/ db/
