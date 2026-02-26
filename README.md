@@ -13,60 +13,87 @@
 ## Architecture Overview
 
 ```mermaid
-flowchart TB
-    subgraph OCP["☁️ OpenShift 4.21.2 — Azure Red Hat OpenShift"]
-        direction TB
+%%{init: {'theme': 'dark', 'themeVariables': { 'fontSize': '14px', 'fontFamily': 'Segoe UI, Helvetica, sans-serif', 'lineColor': '#8B949E' }}}%%
 
-        subgraph EDGE["📡 Namespace: edge-collector<br/><i>Workers: 3× general nodes</i>"]
-            direction TB
-            GEN["🔄 <b>Data Generator</b><br/>58 procedure types<br/>3 facilities<br/>Log-normal durations"]
-            EPG[("🗄️ <b>Edge PostgreSQL</b><br/>Raw case events")]
-            GEN -->|writes synthetic events| EPG
-        end
+flowchart LR
 
-        subgraph CENTRAL["🧠 Namespace: central-analytics"]
-            direction TB
-            
-            subgraph CPU_POOL["⚙️ General Workers"]
-                ETL["⏱️ <b>ETL CronJob</b><br/>Every 4 hours<br/>Watermark-based<br/>Idempotent inserts"]
-                CPG[("🗄️ <b>Central PostgreSQL</b><br/>Aggregated data")]
-                ETL -->|"INSERT ... ON CONFLICT<br/>DO NOTHING"| CPG
-            end
+  subgraph OCP["<b>OpenShift 4.21 · Azure Red Hat OpenShift</b>"]
+    direction LR
 
-            subgraph GPU_NODE["🟢 GPU Worker: NVIDIA H100"]
-                ANA["📊 <b>GPU Analytics</b><br/>RAPIDS cuDF/cuML<br/>XGBoost predictions<br/>Operational insights"]
-            end
-
-            CPG ---|reads consolidated data| ANA
-        end
-
-        EPG --->|"Pattern B: Central pulls<br/>via ClusterIP Service"| ETL
+    subgraph EDGE[" "]
+      direction TB
+      EDGE_TITLE["<b>📡 edge-collector</b>"]
+      GEN("🔄 Data Generator\n<i>58 procedures · 3 facilities</i>")
+      EPG[("🗄️ Edge Postgres\n<i>raw case events</i>")]
+      GEN -- "synthetic\nevents" --> EPG
+      EDGE_TITLE ~~~ GEN
     end
 
-    ANA -->|outputs| OUT["📈 <b>Results</b><br/>• Aggregates CSV<br/>• ML model metrics<br/>• Actionable insights"]
+    subgraph CENTRAL[" "]
+      direction TB
+      CENTRAL_TITLE["<b>🧠 central-analytics</b>"]
 
-    style OCP fill:#1a1a2e,stroke:#e94560,stroke-width:2px,color:#eee
-    style EDGE fill:#16213e,stroke:#0f3460,stroke-width:2px,color:#eee
-    style CENTRAL fill:#16213e,stroke:#0f3460,stroke-width:2px,color:#eee
-    style CPU_POOL fill:#1a1a3e,stroke:#533483,stroke-width:1px,color:#eee
-    style GPU_NODE fill:#0a3d0a,stroke:#76b900,stroke-width:2px,color:#eee
-    style GEN fill:#e94560,stroke:#e94560,color:#fff
-    style EPG fill:#0f3460,stroke:#53a8b6,color:#fff
-    style ETL fill:#533483,stroke:#533483,color:#fff
-    style CPG fill:#0f3460,stroke:#53a8b6,color:#fff
-    style ANA fill:#76b900,stroke:#76b900,color:#fff
-    style OUT fill:#e94560,stroke:#e94560,color:#fff
+      subgraph WORKERS[" "]
+        direction TB
+        ETL("⏱️ ETL CronJob\n<i>every 4 h · watermark-based</i>")
+        CPG[("🗄️ Central Postgres\n<i>consolidated data</i>")]
+        ETL -- "INSERT …\nON CONFLICT\nDO NOTHING" --> CPG
+      end
+
+      subgraph GPU[" "]
+        direction TB
+        ANA("📊 GPU Analytics\n<i>RAPIDS cuDF / cuML\nXGBoost gpu_hist</i>")
+      end
+
+      CENTRAL_TITLE ~~~ WORKERS
+      WORKERS ~~~ GPU
+      CPG -. "reads" .-> ANA
+    end
+
+    EPG == "Pattern B\ncentral pulls" ==> ETL
+
+  end
+
+  ANA -- "outputs" --> OUT("📈 Results\n<i>aggregates · model metrics\nactionable insights</i>")
+
+  classDef cluster fill:#0D1117,stroke:#30363D,stroke-width:1px,color:#C9D1D9
+  classDef edgeNs fill:#161B22,stroke:#1F6FEB,stroke-width:2px,color:#C9D1D9,rx:8
+  classDef centralNs fill:#161B22,stroke:#8B5CF6,stroke-width:2px,color:#C9D1D9,rx:8
+  classDef workerPool fill:#1C2128,stroke:#30363D,stroke-width:1px,stroke-dasharray:4,color:#8B949E
+  classDef gpuPool fill:#0D2818,stroke:#3FB950,stroke-width:2px,stroke-dasharray:0,color:#C9D1D9,rx:8
+  classDef app fill:#1F6FEB,stroke:#58A6FF,stroke-width:1px,color:#FFFFFF,rx:12
+  classDef db fill:#21262D,stroke:#58A6FF,stroke-width:1px,color:#C9D1D9
+  classDef gpu fill:#238636,stroke:#3FB950,stroke-width:1.5px,color:#FFFFFF,rx:12
+  classDef result fill:#8B5CF6,stroke:#A78BFA,stroke-width:1px,color:#FFFFFF,rx:12
+  classDef label fill:none,stroke:none,color:#8B949E
+
+  class OCP cluster
+  class EDGE edgeNs
+  class CENTRAL centralNs
+  class WORKERS workerPool
+  class GPU gpuPool
+  class GEN,ETL app
+  class EPG,CPG db
+  class ANA gpu
+  class OUT result
+  class EDGE_TITLE,CENTRAL_TITLE label
+
+  linkStyle 0 stroke:#58A6FF,stroke-width:1.5px
+  linkStyle 1 stroke:#58A6FF,stroke-width:1.5px
+  linkStyle 2 stroke:#8B949E,stroke-width:1px,stroke-dasharray:4
+  linkStyle 3 stroke:#F0883E,stroke-width:2.5px
+  linkStyle 4 stroke:#A78BFA,stroke-width:1.5px
 ```
 
 ### Data Flow Summary
 
-| Stage | Component | Schedule | Where |
-|:------|:----------|:---------|:------|
-| **1. Generate** | Synthetic data generator | One-time Job | General workers |
-| **2. Collect** | Edge PostgreSQL | Continuous | General workers |
-| **3. Transfer** | ETL CronJob | `0 */4 * * *` | General workers |
-| **4. Store** | Central PostgreSQL | Continuous | General workers |
-| **5. Analyze** | GPU analytics pipeline | On-demand Job | H100 GPU node |
+| # | Stage | Component | Schedule | Runs on |
+|:-:|:------|:----------|:---------|:--------|
+| 1 | **Generate** | Synthetic data generator | One-time Job | General workers |
+| 2 | **Collect** | Edge PostgreSQL | Continuous | General workers |
+| 3 | **Transfer** | ETL CronJob | `0 */4 * * *` | General workers |
+| 4 | **Store** | Central PostgreSQL | Continuous | General workers |
+| 5 | **Analyze** | GPU analytics pipeline | On-demand Job | NVIDIA H100 node |
 
 ## Components
 
