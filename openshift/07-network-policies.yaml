@@ -1,0 +1,47 @@
+# NetworkPolicy: Allow ETL in central-analytics to reach edge-collector
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-etl-to-edge
+  namespace: edge-collector
+  labels:
+    app.kubernetes.io/part-of: hls-demo
+spec:
+  podSelector:
+    matchLabels:
+      app: edge-postgres
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: hls-demo
+          tier: central
+      podSelector:
+        matchLabels:
+          app: etl-job
+    ports:
+    - protocol: TCP
+      port: 5432
+---
+# NetworkPolicy: Central Postgres only accessible from within namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: central-postgres-internal
+  namespace: central-analytics
+  labels:
+    app.kubernetes.io/part-of: hls-demo
+spec:
+  podSelector:
+    matchLabels:
+      app: central-postgres
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector: {}
+    ports:
+    - protocol: TCP
+      port: 5432

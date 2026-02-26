@@ -1,0 +1,71 @@
+# ETL CronJob - runs every 4 hours (Pattern B: Central pulls from Edge)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: etl-edge-to-central
+  namespace: central-analytics
+  labels:
+    app: etl-job
+    app.kubernetes.io/part-of: hls-demo
+    app.kubernetes.io/component: etl
+spec:
+  schedule: "0 */4 * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+      labels:
+        app: etl-job
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+            app: etl-job
+        spec:
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: nvidia.com/gpu.present
+                    operator: DoesNotExist
+          restartPolicy: OnFailure
+          containers:
+          - name: etl
+            image: quay.io/YOURUSER/hls-etl-job:latest
+            envFrom:
+            - secretRef:
+                name: edge-db-remote-credentials
+            - secretRef:
+                name: central-db-credentials
+            env:
+            - name: CENTRAL_DB_HOST
+              value: "central-postgres"
+            - name: CENTRAL_DB_PORT
+              value: "5432"
+            - name: CENTRAL_DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: central-db-credentials
+                  key: POSTGRES_DB
+            - name: CENTRAL_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: central-db-credentials
+                  key: POSTGRES_USER
+            - name: CENTRAL_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: central-db-credentials
+                  key: POSTGRES_PASSWORD
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "250m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"

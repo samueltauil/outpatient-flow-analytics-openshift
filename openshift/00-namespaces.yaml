@@ -1,0 +1,17 @@
+# Edge Collector Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: edge-collector
+  labels:
+    app.kubernetes.io/part-of: hls-demo
+    tier: edge
+---
+# Central Analytics Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: central-analytics
+  labels:
+    app.kubernetes.io/part-of: hls-demo
+    tier: central

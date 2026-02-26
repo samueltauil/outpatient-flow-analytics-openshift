@@ -1,0 +1,22 @@
+# ==============================================================================
+# Data Generator Container
+# Generates synthetic outpatient case events and writes to edge PostgreSQL
+# ==============================================================================
+FROM registry.access.redhat.com/ubi9/python-311:latest
+
+LABEL name="hls-data-generator" \
+      version="0.1.0" \
+      description="Synthetic outpatient case event generator"
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt psycopg2-binary
+
+COPY src/ src/
+COPY db/ db/
+
+USER 1001
+
+ENTRYPOINT ["python", "-m", "src.generator.generate"]
+CMD ["--start-date", "2025-01-06", "--end-date", "2025-03-31", "--output", "/data/cases.csv"]

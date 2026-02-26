@@ -1,0 +1,67 @@
+# GPU Analytics Job - runs on H100 GPU node
+# Triggered after ETL or on-demand for batch analytics
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gpu-analytics
+  namespace: central-analytics
+  labels:
+    app: gpu-analytics
+    app.kubernetes.io/part-of: hls-demo
+    app.kubernetes.io/component: analytics
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app: gpu-analytics
+    spec:
+      # Pin to GPU node
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      restartPolicy: OnFailure
+      containers:
+      - name: analytics
+        image: quay.io/YOURUSER/hls-analytics:latest
+        args:
+        - "--input"
+        - "postgresql://$(CENTRAL_DB_USER):$(CENTRAL_DB_PASSWORD)@central-postgres:5432/$(CENTRAL_DB_NAME)"
+        - "--output-dir"
+        - "/data/analytics"
+        envFrom:
+        - secretRef:
+            name: central-db-credentials
+        volumeMounts:
+        - name: analytics-output
+          mountPath: /data/analytics
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2"
+            nvidia.com/gpu: "1"
+          limits:
+            memory: "16Gi"
+            cpu: "8"
+            nvidia.com/gpu: "1"
+      volumes:
+      - name: analytics-output
+        persistentVolumeClaim:
+          claimName: analytics-output-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: analytics-output-pvc
+  namespace: central-analytics
+  labels:
+    app.kubernetes.io/part-of: hls-demo
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

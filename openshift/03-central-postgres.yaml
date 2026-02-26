@@ -1,0 +1,109 @@
+# Central PostgreSQL - runs on general worker nodes
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: central-postgres
+  namespace: central-analytics
+  labels:
+    app: central-postgres
+    app.kubernetes.io/part-of: hls-demo
+    app.kubernetes.io/component: central-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: central-postgres
+  template:
+    metadata:
+      labels:
+        app: central-postgres
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: nvidia.com/gpu.present
+                operator: DoesNotExist
+      containers:
+      - name: postgres
+        image: registry.redhat.io/rhel9/postgresql-15:latest
+        ports:
+        - containerPort: 5432
+          name: postgres
+        env:
+        - name: POSTGRESQL_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: central-db-credentials
+              key: POSTGRES_DB
+        - name: POSTGRESQL_USER
+          valueFrom:
+            secretKeyRef:
+              name: central-db-credentials
+              key: POSTGRES_USER
+        - name: POSTGRESQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: central-db-credentials
+              key: POSTGRES_PASSWORD
+        volumeMounts:
+        - name: central-pgdata
+          mountPath: /var/lib/pgsql/data
+        - name: init-scripts
+          mountPath: /opt/app-root/src/postgresql-init/
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "2"
+        livenessProbe:
+          exec:
+            command: ["pg_isready", "-U", "$(POSTGRESQL_USER)"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command: ["pg_isready", "-U", "$(POSTGRESQL_USER)"]
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: central-pgdata
+        persistentVolumeClaim:
+          claimName: central-pgdata-pvc
+      - name: init-scripts
+        configMap:
+          name: central-db-init
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: central-pgdata-pvc
+  namespace: central-analytics
+  labels:
+    app.kubernetes.io/part-of: hls-demo
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: central-postgres
+  namespace: central-analytics
+  labels:
+    app: central-postgres
+    app.kubernetes.io/part-of: hls-demo
+spec:
+  selector:
+    app: central-postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+    name: postgres
+  type: ClusterIP

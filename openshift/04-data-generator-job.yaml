@@ -1,0 +1,65 @@
+# Data Generator Job - runs once to seed edge DB, or on-demand
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: data-generator
+  namespace: edge-collector
+  labels:
+    app: data-generator
+    app.kubernetes.io/part-of: hls-demo
+    app.kubernetes.io/component: generator
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: data-generator
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: nvidia.com/gpu.present
+                operator: DoesNotExist
+      restartPolicy: OnFailure
+      containers:
+      - name: generator
+        image: quay.io/YOURUSER/hls-data-generator:latest
+        args:
+        - "--start-date"
+        - "2025-01-06"
+        - "--end-date"
+        - "2025-03-31"
+        - "--output"
+        - "/data/cases.csv"
+        - "--format"
+        - "csv"
+        volumeMounts:
+        - name: data-volume
+          mountPath: /data
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1"
+      volumes:
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: generator-data-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: generator-data-pvc
+  namespace: edge-collector
+  labels:
+    app.kubernetes.io/part-of: hls-demo
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi

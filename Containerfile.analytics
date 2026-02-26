@@ -1,0 +1,22 @@
+# ==============================================================================
+# Analytics Container (GPU-capable with CPU fallback)
+# Runs on H100 GPU node with RAPIDS + XGBoost, falls back to CPU
+# ==============================================================================
+FROM nvcr.io/nvidia/rapidsai/base:24.12-cuda12.5-py3.12
+
+LABEL name="hls-analytics" \
+      version="0.1.0" \
+      description="GPU-accelerated outpatient flow analytics"
+
+WORKDIR /app
+
+COPY requirements-ml.txt .
+RUN pip install --no-cache-dir -r requirements-ml.txt psycopg2-binary
+
+COPY src/ src/
+COPY db/ db/
+
+USER 1001
+
+ENTRYPOINT ["python", "-m", "src.analytics.analytics"]
+CMD ["--input", "/data/cases.csv", "--output-dir", "/data/analytics"]

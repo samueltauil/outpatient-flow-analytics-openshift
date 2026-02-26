@@ -1,0 +1,21 @@
+# ==============================================================================
+# ETL Batch Job Container
+# Pulls data from edge PostgreSQL → central PostgreSQL every 4 hours
+# ==============================================================================
+FROM registry.access.redhat.com/ubi9/python-311:latest
+
+LABEL name="hls-etl-job" \
+      version="0.1.0" \
+      description="ETL batch job for edge-to-central data movement"
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt psycopg2-binary
+
+COPY src/ src/
+COPY db/ db/
+
+USER 1001
+
+ENTRYPOINT ["python", "-m", "src.etl.batch_etl"]
