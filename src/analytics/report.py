@@ -131,31 +131,47 @@ tr:hover td{background:rgba(88,166,255,0.03)}
 
 /* Pills */
 .pill{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;letter-spacing:0.3px;text-transform:uppercase}
-.pill-variance{background:rgba(240,136,62,0.12);color:var(--orange)}
-.pill-late{background:rgba(248,81,73,0.12);color:var(--red)}
-.pill-summary{background:rgba(88,166,255,0.12);color:var(--blue)}
-.pill-cancel{background:rgba(167,139,250,0.12);color:var(--purple)}
-.pill-bottleneck{background:rgba(248,81,73,0.12);color:var(--red)}
-.pill-cross{background:rgba(240,136,62,0.12);color:var(--orange)}
+.pill-high{background:rgba(248,81,73,0.15);color:var(--red)}
+.pill-medium{background:rgba(240,136,62,0.15);color:var(--orange)}
+.pill-info{background:rgba(88,166,255,0.12);color:var(--blue)}
+
+/* Insight tabs (pure CSS) */
+.insight-section{margin-bottom:40px}
+.insight-section>h2{font-size:16px;font-weight:600;margin-bottom:6px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.insight-summary{color:var(--muted);font-size:13px;margin-bottom:20px;display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+.sev-badge{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600}
+.sev-badge .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.dot-high{background:var(--red)} .dot-med{background:var(--orange)} .dot-info{background:var(--blue)}
+
+.tab-bar{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px;overflow-x:auto}
+.tab-radio{display:none}
+.tab-label{padding:10px 18px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;
+           border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:color 0.15s,border-color 0.15s;
+           letter-spacing:0.2px;display:flex;align-items:center;gap:6px}
+.tab-label:hover{color:var(--text)}
+.tab-count{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:0 7px;font-size:11px;
+           font-variant-numeric:tabular-nums;line-height:18px}
+.tab-radio:checked+.tab-label{color:var(--blue);border-bottom-color:var(--blue)}
+.tab-radio:checked+.tab-label .tab-count{background:rgba(88,166,255,0.12);border-color:rgba(88,166,255,0.3);color:var(--blue)}
+.tab-panel{display:none}
+.tab-radio:checked~.tab-panel{display:block}
+/* Each tab group needs its own panel selector — handled via id matching in JS below */
 
 /* Insight cards */
-.insight-section{margin-bottom:40px}
-.insight-section h2{font-size:16px;font-weight:600;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border)}
-.insight-section .section-desc{color:var(--muted);font-size:13px;margin-bottom:20px}
-.insight-group{margin-bottom:28px}
-.insight-group-title{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
-.insight-group-count{font-variant-numeric:tabular-nums;color:var(--text);background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1px 8px;font-size:11px}
-.insight-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:18px 20px;margin-bottom:10px;display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:start}
-.insight-card:hover{border-color:rgba(88,166,255,0.3)}
-.insight-severity{width:4px;border-radius:2px;min-height:48px;align-self:stretch}
-.sev-high{background:var(--red)}
-.sev-medium{background:var(--orange)}
-.sev-info{background:var(--blue)}
-.insight-body{}
-.insight-finding{font-size:13px;line-height:1.55;margin-bottom:8px}
-.insight-action{font-size:12px;color:var(--muted);line-height:1.5;padding:8px 12px;background:rgba(88,166,255,0.04);border-radius:4px;border-left:2px solid var(--border)}
-.insight-action strong{color:var(--text);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.4px}
-.insight-meta{display:flex;gap:10px;align-items:center;margin-bottom:6px}
+.i-card{background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:12px;overflow:hidden}
+.i-card:hover{border-color:rgba(88,166,255,0.25)}
+.i-head{padding:16px 20px;display:flex;align-items:center;gap:12px}
+.i-sev{width:4px;align-self:stretch;border-radius:2px;flex-shrink:0}
+.i-sev-high{background:var(--red)} .i-sev-medium{background:var(--orange)} .i-sev-info{background:var(--blue)}
+.i-title{font-size:14px;font-weight:600;flex:1}
+.i-facility{color:var(--muted);font-size:12px;flex-shrink:0}
+.i-body{padding:0 20px 18px 36px;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.i-block{font-size:13px;line-height:1.6}
+.i-block-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted);margin-bottom:6px}
+.i-block-full{grid-column:1/-1}
+.i-block-action{background:rgba(56,139,253,0.06);border:1px solid rgba(56,139,253,0.15);border-radius:6px;padding:14px 16px}
+.i-block-action .i-block-label{color:var(--blue)}
+.i-block-impact{background:rgba(240,136,62,0.04);border:1px solid rgba(240,136,62,0.1);border-radius:6px;padding:14px 16px}
 
 /* Model cards */
 .model-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
@@ -324,58 +340,110 @@ def build_report(results: Dict[str, Any], aggs: pd.DataFrame) -> str:
         </div>""")
     parts.append('</div></div>')
 
-    # Insights — categorized cards with severity + recommended actions
-    insight_groups = {
-        "bottleneck": {"title": "Workflow Bottlenecks", "pill": "pill-bottleneck"},
-        "high_variance": {"title": "Duration Variability Alerts", "pill": "pill-variance"},
-        "late_starts": {"title": "Scheduling Delays", "pill": "pill-late"},
-        "cross_facility": {"title": "Cross-Facility Comparisons", "pill": "pill-cross"},
-        "cancellation_rate": {"title": "Cancellation Analysis", "pill": "pill-cancel"},
-        "facility_summary": {"title": "Facility Overviews", "pill": "pill-summary"},
-    }
-    severity_label = {"high": "High Priority", "medium": "Review", "info": "Informational"}
-
-    n_actionable = sum(1 for i in insights if i.get("severity") in ("high", "medium"))
-    parts.append(f'<div class="insight-section">')
-    parts.append(f'<h2>Actionable Insights</h2>')
-    parts.append(f'<p class="section-desc">{len(insights)} findings identified across '
-                 f'{n_facilities} facilities — <strong>{n_actionable} require review</strong>. '
-                 f'Insights are ordered by severity. Each includes a recommended action.</p>')
+    # ---------- Actionable Insights — tabbed interface ----------
+    TAB_ORDER = [
+        ("all", "All Findings"),
+        ("bottleneck", "Bottlenecks"),
+        ("high_variance", "Duration Variability"),
+        ("late_starts", "Late Starts"),
+        ("cross_facility", "Facility Comparisons"),
+        ("cancellation_rate", "Cancellations"),
+        ("facility_summary", "Facility Overviews"),
+    ]
 
     grouped: Dict[str, list] = {}
     for ins in insights:
         grouped.setdefault(ins["type"], []).append(ins)
+    n_high = sum(1 for i in insights if i.get("severity") == "high")
+    n_med = sum(1 for i in insights if i.get("severity") == "medium")
+    n_info = sum(1 for i in insights if i.get("severity") == "info")
 
-    # Render groups in priority order
-    for gtype in ["bottleneck", "high_variance", "late_starts", "cross_facility",
-                   "cancellation_rate", "facility_summary"]:
-        items = grouped.get(gtype, [])
-        if not items:
+    parts.append('<div class="insight-section">')
+    parts.append('<h2>Actionable Insights</h2>')
+    parts.append('<div class="insight-summary">')
+    parts.append(f'<span>{len(insights)} findings across {n_facilities} facilities</span>')
+    if n_high:
+        parts.append(f'<span class="sev-badge"><span class="dot dot-high"></span>{n_high} high priority</span>')
+    if n_med:
+        parts.append(f'<span class="sev-badge"><span class="dot dot-med"></span>{n_med} need review</span>')
+    if n_info:
+        parts.append(f'<span class="sev-badge"><span class="dot dot-info"></span>{n_info} informational</span>')
+    parts.append('</div>')
+
+    # Tab bar
+    parts.append('<div class="tab-bar">')
+    for idx, (tab_key, tab_label) in enumerate(TAB_ORDER):
+        count = len(insights) if tab_key == "all" else len(grouped.get(tab_key, []))
+        if count == 0 and tab_key != "all":
             continue
-        gmeta = insight_groups.get(gtype, {"title": gtype.replace("_", " ").title(), "pill": "pill-summary"})
-        parts.append(f'<div class="insight-group">')
-        parts.append(f'<div class="insight-group-title">'
-                     f'<span class="pill {gmeta["pill"]}">{html.escape(gmeta["title"])}</span>'
-                     f'<span class="insight-group-count">{len(items)}</span></div>')
+        checked = ' checked' if idx == 0 else ''
+        parts.append(f'<input class="tab-radio" type="radio" name="itab" id="itab-{tab_key}"{checked}/>')
+        parts.append(f'<label class="tab-label" for="itab-{tab_key}">'
+                     f'{html.escape(tab_label)}<span class="tab-count">{count}</span></label>')
+    parts.append('</div>')
+
+    # Tab panels — rendered as divs, toggled by JS (simpler than pure CSS sibling selectors for N tabs)
+    def _render_cards(items: List[Dict]) -> str:
+        """Render a list of insight cards as HTML."""
+        out = []
         for ins in items:
             sev = ins.get("severity", "info")
             fac = ins.get("facility", "All")
+            title = ins.get("title", ins.get("type", "").replace("_", " ").title())
             msg = ins.get("message", "")
+            impact = ins.get("impact", "")
             action = ins.get("action", "")
-            parts.append(f'<div class="insight-card">'
-                         f'<div class="insight-severity sev-{sev}"></div>'
-                         f'<div class="insight-body">'
-                         f'<div class="insight-meta">'
-                         f'<span class="pill {gmeta["pill"]}">{html.escape(severity_label.get(sev, sev))}</span>'
-                         f'<span style="color:var(--muted);font-size:12px">{html.escape(fac)}</span>'
-                         f'</div>'
-                         f'<div class="insight-finding">{html.escape(msg)}</div>')
+            sev_label = {"high": "High Priority", "medium": "Needs Review", "info": "Informational"}.get(sev, sev)
+
+            out.append(f'<div class="i-card">')
+            out.append(f'<div class="i-head">'
+                       f'<div class="i-sev i-sev-{sev}"></div>'
+                       f'<span class="pill pill-{sev}">{html.escape(sev_label)}</span>'
+                       f'<span class="i-title">{html.escape(title)}</span>'
+                       f'<span class="i-facility">{html.escape(fac)}</span>'
+                       f'</div>')
+            out.append('<div class="i-body">')
+
+            # What we found — always full width
+            out.append(f'<div class="i-block i-block-full">'
+                       f'<div class="i-block-label">What we found</div>'
+                       f'{html.escape(msg)}</div>')
+
+            # Why it matters + What to do — side by side
+            if impact:
+                out.append(f'<div class="i-block i-block-impact">'
+                           f'<div class="i-block-label">Why it matters</div>'
+                           f'{html.escape(impact)}</div>')
             if action:
-                parts.append(f'<div class="insight-action">'
-                             f'<strong>Recommended action</strong><br/>{html.escape(action)}</div>')
-            parts.append('</div></div>')
+                out.append(f'<div class="i-block i-block-action">'
+                           f'<div class="i-block-label">Recommended actions</div>'
+                           f'{html.escape(action)}</div>')
+
+            out.append('</div></div>')  # close i-body, i-card
+        return "\n".join(out)
+
+    for tab_key, _ in TAB_ORDER:
+        items = insights if tab_key == "all" else grouped.get(tab_key, [])
+        if not items and tab_key != "all":
+            continue
+        display = "block" if tab_key == "all" else "none"
+        parts.append(f'<div class="tab-panel" id="panel-{tab_key}" style="display:{display}">')
+        parts.append(_render_cards(items))
         parts.append('</div>')
-    parts.append('</div>')
+
+    # Tiny JS for tab switching (no external deps)
+    parts.append("""<script>
+document.querySelectorAll('input[name="itab"]').forEach(radio=>{
+  radio.addEventListener('change',()=>{
+    document.querySelectorAll('.tab-panel').forEach(p=>p.style.display='none');
+    const id=radio.id.replace('itab-','panel-');
+    const panel=document.getElementById(id);
+    if(panel)panel.style.display='block';
+  });
+});
+</script>""")
+
+    parts.append('</div>')  # close insight-section
 
     # Top procedures table
     parts.append('<div class="section"><h2>Top 20 Procedures by Volume</h2><table>')

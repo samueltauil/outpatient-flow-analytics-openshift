@@ -273,8 +273,10 @@ def generate_insights(df: pd.DataFrame, aggs: pd.DataFrame) -> List[Dict]:
     Each insight includes:
       - type: category key
       - severity: "high" | "medium" | "info"
-      - message: human-readable summary
-      - action: specific recommended next step
+      - title: short headline for the insight
+      - message: human-readable description of the finding
+      - impact: why this matters for operations
+      - action: specific recommended steps to take
     """
     insights = []
 
@@ -293,14 +295,21 @@ def generate_insights(df: pd.DataFrame, aggs: pd.DataFrame) -> List[Dict]:
                 "procedure": row["procedure_type"],
                 "total_duration_std": round(std, 1),
                 "coefficient_of_variation": round(cv, 1),
+                "title": f"Unpredictable duration: {row['procedure_type']}",
                 "message": (
-                    f"{row['facility_id']}: {row['procedure_type']} has unpredictable "
-                    f"duration (σ={std:.0f} min, CV={cv:.0f}%). "
-                    f"Mean {mean:.0f} min but p90 {row.get('dur_total_p90', 0):.0f} min."
+                    f"At {row['facility_id']}, {row['procedure_type']} shows a standard deviation "
+                    f"of {std:.0f} minutes (CV {cv:.0f}%). The average case takes {mean:.0f} minutes, "
+                    f"but 10% of cases exceed {row.get('dur_total_p90', 0):.0f} minutes."
+                ),
+                "impact": (
+                    "High duration variability makes scheduling unreliable. Downstream cases "
+                    "are frequently delayed when these procedures overrun, reducing daily throughput "
+                    "and increasing overtime costs."
                 ),
                 "action": (
-                    "Review case mix and surgeon variability. Consider dedicated block "
-                    "scheduling with buffer time to absorb outliers."
+                    "1. Stratify cases by surgeon and complexity to identify the source of variation. "
+                    "2. Consider dedicated block scheduling with 15-20 min buffer for this procedure. "
+                    "3. Pre-screen complex cases for additional OR time allocation."
                 ),
             })
 
@@ -316,13 +325,21 @@ def generate_insights(df: pd.DataFrame, aggs: pd.DataFrame) -> List[Dict]:
                 "facility": row["facility_id"],
                 "procedure": row["procedure_type"],
                 "late_start_rate": round(rate, 3),
+                "title": f"Chronic late starts: {row['procedure_type']}",
                 "message": (
-                    f"{row['facility_id']}: {row['procedure_type']} starts late "
-                    f"{rate:.0%} of the time (>15 min past scheduled)."
+                    f"At {row['facility_id']}, {row['procedure_type']} starts more than "
+                    f"15 minutes past the scheduled time in {rate:.0%} of cases."
+                ),
+                "impact": (
+                    "Late surgical starts cascade through the daily schedule, reducing OR utilization "
+                    "and causing last-case delays. Patients experience longer wait times, "
+                    "and staff overtime increases."
                 ),
                 "action": (
-                    "Audit pre-op preparation workflow. Verify patient arrival "
-                    "instructions and pre-op lab turnaround times."
+                    "1. Audit the pre-op preparation timeline — identify where minutes are lost. "
+                    "2. Verify patient arrival instructions (target 60-90 min before OR time). "
+                    "3. Ensure pre-op labs and consults are completed the day before. "
+                    "4. Consider staggering check-in times rather than block-booking."
                 ),
             })
 
@@ -332,6 +349,29 @@ def generate_insights(df: pd.DataFrame, aggs: pd.DataFrame) -> List[Dict]:
         "dur_preop_to_op_mean": "Pre-op to OR",
         "dur_op_to_postop_mean": "OR to PACU",
         "dur_postop_to_discharge_mean": "PACU to Discharge",
+    }
+    phase_actions = {
+        "Check-in to Pre-op": (
+            "1. Implement digital pre-registration to reduce check-in paperwork. "
+            "2. Use a patient-tracking board to flag arrivals immediately. "
+            "3. Pre-assign nursing staff to incoming patients."
+        ),
+        "Pre-op to OR": (
+            "1. Ensure the OR is being turned over during pre-op, not sequentially. "
+            "2. Standardize the pre-op checklist to eliminate redundant steps. "
+            "3. Move anaesthesia assessment earlier in the workflow."
+        ),
+        "OR to PACU": (
+            "1. Review surgical close and handoff protocols for delays. "
+            "2. Ensure PACU beds are available before case completion. "
+            "3. Streamline the transport and handoff process."
+        ),
+        "PACU to Discharge": (
+            "1. Begin discharge planning during the procedure, not after. "
+            "2. Standardize recovery milestones for common procedures. "
+            "3. Pre-arrange transport and home care instructions. "
+            "4. Set phase-specific time targets and track compliance."
+        ),
     }
     available_phases = [c for c in phase_cols if c in aggs.columns]
     if available_phases:
@@ -344,21 +384,29 @@ def generate_insights(df: pd.DataFrame, aggs: pd.DataFrame) -> List[Dict]:
                 worst_val = phase_means[worst_col]
                 pct = worst_val / total * 100
                 if pct > 35:
+                    phase_name = phase_cols[worst_col]
                     insights.append({
                         "type": "bottleneck",
                         "severity": "high" if pct > 45 else "medium",
                         "facility": fac,
-                        "phase": phase_cols[worst_col],
+                        "phase": phase_name,
                         "phase_minutes": round(worst_val, 1),
                         "phase_pct": round(pct, 1),
+                        "title": f"Bottleneck: {phase_name} phase",
                         "message": (
-                            f"{fac}: \"{phase_cols[worst_col]}\" phase accounts for "
-                            f"{pct:.0f}% of total patient time ({worst_val:.0f} min avg)."
+                            f"At {fac}, the \"{phase_name}\" phase consumes {pct:.0f}% of the "
+                            f"total patient journey ({worst_val:.0f} min average out of "
+                            f"{total:.0f} min total)."
                         ),
-                        "action": (
-                            f"Investigate {phase_cols[worst_col].lower()} workflows. "
+                        "impact": (
+                            f"This phase is the single largest contributor to patient time at {fac}. "
+                            f"A 10-15% reduction would save approximately "
+                            f"{worst_val * 0.125:.0f} minutes per case."
+                        ),
+                        "action": phase_actions.get(phase_name, (
+                            f"Investigate {phase_name.lower()} workflows. "
                             f"Target reduction of this phase by 10-15% to improve throughput."
-                        ),
+                        )),
                     })
 
     # ---- 4. Cross-facility comparison (best-practice gaps) ----
@@ -381,14 +429,21 @@ def generate_insights(df: pd.DataFrame, aggs: pd.DataFrame) -> List[Dict]:
                         "gap_minutes": round(gap, 1),
                         "gap_pct": round(gap_pct, 1),
                         "reference_facility": str(fastest["facility_id"]),
+                        "title": f"Performance gap: {proc}",
                         "message": (
-                            f"{slowest['facility_id']}: {proc} runs {gap:.0f} min slower "
-                            f"({gap_pct:.0f}%) than {fastest['facility_id']} "
-                            f"({slowest['dur_total_mean']:.0f} vs {fastest['dur_total_mean']:.0f} min)."
+                            f"{proc} at {slowest['facility_id']} takes {slowest['dur_total_mean']:.0f} min "
+                            f"on average — {gap:.0f} min slower ({gap_pct:.0f}%) than "
+                            f"{fastest['facility_id']} ({fastest['dur_total_mean']:.0f} min)."
+                        ),
+                        "impact": (
+                            f"If {slowest['facility_id']} matched {fastest['facility_id']}'s efficiency, "
+                            f"each case would free {gap:.0f} minutes of OR and recovery time."
                         ),
                         "action": (
-                            f"Benchmark {slowest['facility_id']} protocols against "
-                            f"{fastest['facility_id']} to identify transferable practices."
+                            f"1. Compare {slowest['facility_id']} and {fastest['facility_id']} "
+                            f"protocols side by side for {proc}. "
+                            f"2. Identify differences in staffing, equipment, or pre-op preparation. "
+                            f"3. Pilot the faster facility's workflow at the slower site."
                         ),
                     })
 
@@ -406,11 +461,14 @@ def generate_insights(df: pd.DataFrame, aggs: pd.DataFrame) -> List[Dict]:
             "avg_total_minutes": round(avg_total, 1),
             "p90_total_minutes": round(p90_total, 1),
             "total_cases": vol,
+            "title": f"Facility overview: {fac}",
             "message": (
-                f"{fac}: {vol:,} completed cases. "
-                f"Average total time {avg_total:.0f} min (p90: {p90_total:.0f} min)."
+                f"{fac} processed {vol:,} completed cases during the reporting period. "
+                f"The average patient journey from check-in to discharge is {avg_total:.0f} minutes. "
+                f"The 90th percentile is {p90_total:.0f} minutes."
             ),
-            "action": "No action required — informational baseline.",
+            "impact": "Baseline metric for tracking improvement over time.",
+            "action": "No action required — use as a benchmark for future comparisons.",
         })
 
     # ---- 6. Cancellation rate ----
@@ -425,12 +483,23 @@ def generate_insights(df: pd.DataFrame, aggs: pd.DataFrame) -> List[Dict]:
             "rate": round(cancel_rate, 4),
             "count": canceled,
             "total": total,
-            "message": f"Overall cancellation rate: {cancel_rate:.1%} ({canceled:,}/{total:,}).",
-            "action": (
-                "Review top cancellation reasons. Target root causes "
-                "(patient no-shows, incomplete pre-op clearance, scheduling conflicts)."
+            "title": "Case cancellation rate",
+            "message": (
+                f"Out of {total:,} total cases, {canceled:,} were cancelled — "
+                f"a rate of {cancel_rate:.1%}."
+            ),
+            "impact": (
+                "Each cancelled case represents lost OR time, wasted pre-op resources, "
+                "and a delayed patient. Industry benchmark is typically under 2%."
                 if cancel_rate > 0.02 else
-                "Rate within acceptable range. Continue monitoring."
+                "Current rate is within the industry-accepted range of under 2%."
+            ),
+            "action": (
+                "1. Categorize cancellations by root cause (patient no-show, medical, scheduling). "
+                "2. Focus on the top two reasons — they typically account for 60%+ of cancellations. "
+                "3. Implement day-before confirmation calls and pre-op clearance checklists."
+                if cancel_rate > 0.02 else
+                "Continue monitoring. Set an alert if the rate exceeds 3%."
             ),
         })
 
