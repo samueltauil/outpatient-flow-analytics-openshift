@@ -1,39 +1,72 @@
-# Synthetic Outpatient Flow Analytics Demo
+# 🏥 Synthetic Outpatient Flow Analytics Demo
 
-A reference implementation for a synthetic outpatient surgical flow analytics pipeline, designed to run on **OpenShift Container Platform 4.21** with GPU acceleration via NVIDIA H100.
+> A reference implementation for a synthetic outpatient surgical flow analytics pipeline, designed to run on **OpenShift Container Platform 4.21** with GPU acceleration via NVIDIA H100.
+
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![OpenShift 4.21](https://img.shields.io/badge/OpenShift-4.21-ee0000.svg)](https://docs.openshift.com/)
+[![XGBoost](https://img.shields.io/badge/ML-XGBoost-orange.svg)](https://xgboost.readthedocs.io/)
+[![RAPIDS](https://img.shields.io/badge/GPU-RAPIDS%20cuDF%2FcuML-76b900.svg)](https://rapids.ai/)
+[![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](#)
+
+---
 
 ## Architecture Overview
 
+```mermaid
+flowchart TB
+    subgraph OCP["☁️ OpenShift 4.21.2 — Azure Red Hat OpenShift"]
+        direction TB
+
+        subgraph EDGE["📡 Namespace: edge-collector<br/><i>Workers: 3× general nodes</i>"]
+            direction TB
+            GEN["🔄 <b>Data Generator</b><br/>58 procedure types<br/>3 facilities<br/>Log-normal durations"]
+            EPG[("🗄️ <b>Edge PostgreSQL</b><br/>Raw case events")]
+            GEN -->|writes synthetic events| EPG
+        end
+
+        subgraph CENTRAL["🧠 Namespace: central-analytics"]
+            direction TB
+            
+            subgraph CPU_POOL["⚙️ General Workers"]
+                ETL["⏱️ <b>ETL CronJob</b><br/>Every 4 hours<br/>Watermark-based<br/>Idempotent inserts"]
+                CPG[("🗄️ <b>Central PostgreSQL</b><br/>Aggregated data")]
+                ETL -->|"INSERT ... ON CONFLICT<br/>DO NOTHING"| CPG
+            end
+
+            subgraph GPU_NODE["🟢 GPU Worker: NVIDIA H100"]
+                ANA["📊 <b>GPU Analytics</b><br/>RAPIDS cuDF/cuML<br/>XGBoost predictions<br/>Operational insights"]
+            end
+
+            CPG ---|reads consolidated data| ANA
+        end
+
+        EPG --->|"Pattern B: Central pulls<br/>via ClusterIP Service"| ETL
+    end
+
+    ANA -->|outputs| OUT["📈 <b>Results</b><br/>• Aggregates CSV<br/>• ML model metrics<br/>• Actionable insights"]
+
+    style OCP fill:#1a1a2e,stroke:#e94560,stroke-width:2px,color:#eee
+    style EDGE fill:#16213e,stroke:#0f3460,stroke-width:2px,color:#eee
+    style CENTRAL fill:#16213e,stroke:#0f3460,stroke-width:2px,color:#eee
+    style CPU_POOL fill:#1a1a3e,stroke:#533483,stroke-width:1px,color:#eee
+    style GPU_NODE fill:#0a3d0a,stroke:#76b900,stroke-width:2px,color:#eee
+    style GEN fill:#e94560,stroke:#e94560,color:#fff
+    style EPG fill:#0f3460,stroke:#53a8b6,color:#fff
+    style ETL fill:#533483,stroke:#533483,color:#fff
+    style CPG fill:#0f3460,stroke:#53a8b6,color:#fff
+    style ANA fill:#76b900,stroke:#76b900,color:#fff
+    style OUT fill:#e94560,stroke:#e94560,color:#fff
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    OpenShift 4.21.2 (ARO)                       │
-│                                                                  │
-│  ┌──────────────────────────┐  ┌──────────────────────────────┐ │
-│  │  Namespace:               │  │  Namespace:                   │ │
-│  │  edge-collector           │  │  central-analytics            │ │
-│  │                           │  │                               │ │
-│  │  ┌─────────────────────┐ │  │  ┌─────────────────────────┐ │ │
-│  │  │ Data Generator      │ │  │  │ Central PostgreSQL       │ │ │
-│  │  │ (synthetic events)  │ │  │  │ (aggregated data)        │ │ │
-│  │  └────────┬────────────┘ │  │  └────────▲────────────────┘ │ │
-│  │           │               │  │           │                   │ │
-│  │  ┌────────▼────────────┐ │  │  ┌────────┴────────────────┐ │ │
-│  │  │ Edge PostgreSQL     │◄├──┤──┤ ETL CronJob (4h)        │ │ │
-│  │  │ (raw events)        │ │  │  │ Pattern B: Central pulls │ │ │
-│  │  └─────────────────────┘ │  │  └─────────────────────────┘ │ │
-│  │                           │  │                               │ │
-│  │  Workers: 3× general      │  │  ┌─────────────────────────┐ │ │
-│  └──────────────────────────┘  │  │ GPU Analytics Job        │ │ │
-│                                  │  │ (H100 node)             │ │ │
-│                                  │  │ • XGBoost predictions   │ │ │
-│                                  │  │ • RAPIDS cuDF/cuML      │ │ │
-│                                  │  │ • Operational insights  │ │ │
-│                                  │  └─────────────────────────┘ │ │
-│                                  │                               │ │
-│                                  │  Workers: 1× GPU (H100)       │ │
-│                                  └──────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
-```
+
+### Data Flow Summary
+
+| Stage | Component | Schedule | Where |
+|:------|:----------|:---------|:------|
+| **1. Generate** | Synthetic data generator | One-time Job | General workers |
+| **2. Collect** | Edge PostgreSQL | Continuous | General workers |
+| **3. Transfer** | ETL CronJob | `0 */4 * * *` | General workers |
+| **4. Store** | Central PostgreSQL | Continuous | General workers |
+| **5. Analyze** | GPU analytics pipeline | On-demand Job | H100 GPU node |
 
 ## Components
 
