@@ -442,6 +442,3 @@ prototype-hls/
 | Deterministic seeding | Reproducible demos; same seed = same data for consistent presentations |
 | 58 procedures across 10 lines | Broad enough for meaningful analytics; realistic ASC scope |
 
-## References
-
-See `plan/plan.md` (gitignored; local-only) for the full deep-research reference architecture with citations.
