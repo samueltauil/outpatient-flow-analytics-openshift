@@ -1,0 +1,22 @@
+# ==============================================================================
+# Analytics Container — CPU variant for CI/registry (GPU fallback built-in)
+# For GPU deployment, rebuild with Containerfile.analytics (RAPIDS base image)
+# ==============================================================================
+FROM registry.access.redhat.com/ubi9/python-311:latest
+
+LABEL name="hls-analytics" \
+      version="0.1.0" \
+      description="Outpatient flow analytics (CPU mode; rebuild with Containerfile.analytics for GPU/RAPIDS)"
+
+WORKDIR /app
+
+COPY requirements-ml.txt .
+RUN pip install --no-cache-dir -r requirements-ml.txt psycopg2-binary
+
+COPY src/ src/
+COPY db/ db/
+
+USER 1001
+
+ENTRYPOINT ["python", "-m", "src.analytics.analytics"]
+CMD ["--input", "/data/cases.csv", "--output-dir", "/data/analytics"]

@@ -164,8 +164,22 @@ etl_watermark (source_id PK, last_created_at, last_run_at, rows_transferred)
 - NVIDIA GPU Operator + Node Feature Discovery (NFD) installed
 - H100 GPU worker node with taint `nvidia.com/gpu=:NoSchedule`
 - `oc` CLI authenticated to the cluster
-- `podman` installed locally for building container images
-- A container registry account (e.g., [quay.io](https://quay.io))
+
+### Container Images
+
+Pre-built images are published to GitHub Container Registry and used by the OpenShift manifests:
+
+| Image | Description | Containerfile |
+|:------|:------------|:--------------|
+| [`ghcr.io/samueltauil/hls-data-generator`](https://ghcr.io/samueltauil/hls-data-generator) | Synthetic data generator | `Containerfile.generator` |
+| [`ghcr.io/samueltauil/hls-etl-job`](https://ghcr.io/samueltauil/hls-etl-job) | ETL batch job | `Containerfile.etl` |
+| [`ghcr.io/samueltauil/hls-analytics`](https://ghcr.io/samueltauil/hls-analytics) | Analytics pipeline (CPU) | `Containerfile.analytics-cpu` |
+
+> **GPU variant**: For GPU-accelerated analytics on the H100, rebuild the analytics image using
+> `Containerfile.analytics` (RAPIDS base). The CPU image works identically — the code auto-detects
+> GPU availability at runtime.
+
+Images are automatically rebuilt on every push to `main` via GitHub Actions (`.github/workflows/build-images.yaml`).
 
 ### Manifest Overview
 
@@ -182,51 +196,13 @@ etl_watermark (source_id PK, last_created_at, last_run_at, rows_transferred)
 
 ### Step-by-Step Deployment
 
-#### Step 1 — Set your registry prefix
-
-All manifests use `quay.io/YOURUSER/` as the image prefix. Replace it with your registry:
-
-```bash
-export REGISTRY=quay.io/youruser   # e.g., quay.io/samueltauil
-
-# Update image references in manifests
-sed -i "s|quay.io/YOURUSER|${REGISTRY}|g" openshift/04-data-generator-job.yaml
-sed -i "s|quay.io/YOURUSER|${REGISTRY}|g" openshift/05-etl-cronjob.yaml
-sed -i "s|quay.io/YOURUSER|${REGISTRY}|g" openshift/06-gpu-analytics-job.yaml
-```
-
-#### Step 2 — Build and push container images
-
-Images are built locally with `podman` and pushed to your registry. This avoids
-BuildConfig limitations (external base image auth, portability, NVIDIA RAPIDS image).
-
-```bash
-# Login to your container registry
-podman login quay.io
-
-# Build all three images
-podman build -f Containerfile.generator -t ${REGISTRY}/hls-data-generator:latest .
-podman build -f Containerfile.etl       -t ${REGISTRY}/hls-etl-job:latest .
-podman build -f Containerfile.analytics -t ${REGISTRY}/hls-analytics:latest .
-
-# Push to registry
-podman push ${REGISTRY}/hls-data-generator:latest
-podman push ${REGISTRY}/hls-etl-job:latest
-podman push ${REGISTRY}/hls-analytics:latest
-```
-
-> **Note on the analytics image**: `Containerfile.analytics` uses `nvcr.io/nvidia/rapidsai/base`
-> which requires accepting NVIDIA's terms. If you don't need GPU acceleration during testing,
-> you can build with `Containerfile.generator` base image instead and the analytics code will
-> automatically fall back to CPU.
-
-#### Step 3 — Create namespaces
+#### Step 1 — Create namespaces
 
 ```bash
 oc apply -f openshift/00-namespaces.yaml
 ```
 
-#### Step 4 — Configure secrets
+#### Step 2 — Configure secrets
 
 Edit `openshift/01-secrets.yaml` to set your database passwords (replace `changeme-*` values), then apply:
 
@@ -234,25 +210,12 @@ Edit `openshift/01-secrets.yaml` to set your database passwords (replace `change
 oc apply -f openshift/01-secrets.yaml
 ```
 
-If your registry requires authentication, create a pull secret in each namespace:
+> **Note**: The pre-built images on `ghcr.io` are public — no pull secret is needed.
+> If you rebuild to a private registry, create a pull secret:
+> `oc create secret docker-registry registry-pull-secret --docker-server=REGISTRY --docker-username=USER --docker-password=TOKEN -n NAMESPACE`
+> then `oc secrets link default registry-pull-secret --for=pull -n NAMESPACE`
 
-```bash
-oc create secret docker-registry registry-pull-secret \
-  --docker-server=quay.io \
-  --docker-username=YOURUSER \
-  --docker-password=YOURTOKEN \
-  -n edge-collector
-oc secrets link default registry-pull-secret --for=pull -n edge-collector
-
-oc create secret docker-registry registry-pull-secret \
-  --docker-server=quay.io \
-  --docker-username=YOURUSER \
-  --docker-password=YOURTOKEN \
-  -n central-analytics
-oc secrets link default registry-pull-secret --for=pull -n central-analytics
-```
-
-#### Step 5 — Initialize databases
+#### Step 3 — Initialize databases
 
 Create ConfigMaps from the SQL scripts so PostgreSQL containers run them at startup:
 
@@ -272,13 +235,13 @@ oc wait --for=condition=available deployment/edge-postgres -n edge-collector --t
 oc wait --for=condition=available deployment/central-postgres -n central-analytics --timeout=120s
 ```
 
-#### Step 6 — Apply network policies
+#### Step 4 — Apply network policies
 
 ```bash
 oc apply -f openshift/07-network-policies.yaml
 ```
 
-#### Step 7 — Seed edge DB with synthetic data
+#### Step 5 — Seed edge DB with synthetic data
 
 ```bash
 oc apply -f openshift/04-data-generator-job.yaml
@@ -287,7 +250,7 @@ oc apply -f openshift/04-data-generator-job.yaml
 oc logs -f job/data-generator -n edge-collector
 ```
 
-#### Step 8 — Start the ETL CronJob
+#### Step 6 — Start the ETL CronJob
 
 ```bash
 oc apply -f openshift/05-etl-cronjob.yaml
@@ -299,7 +262,7 @@ oc create job etl-manual-1 --from=cronjob/etl-edge-to-central -n central-analyti
 oc logs -f job/etl-manual-1 -n central-analytics
 ```
 
-#### Step 9 — Run GPU analytics
+#### Step 7 — Run GPU analytics
 
 ```bash
 oc apply -f openshift/06-gpu-analytics-job.yaml
@@ -308,7 +271,7 @@ oc apply -f openshift/06-gpu-analytics-job.yaml
 oc logs -f job/gpu-analytics -n central-analytics
 ```
 
-#### Step 10 — Verify the deployment
+#### Step 8 — Verify the deployment
 
 ```bash
 # Check all pods
@@ -357,9 +320,10 @@ python3 -m src.analytics.analytics --input output/cases.csv --output-dir output/
 ### Container Builds (local testing)
 
 ```bash
-podman build -f Containerfile.generator -t hls-data-generator .
-podman build -f Containerfile.etl -t hls-etl-job .
-podman build -f Containerfile.analytics -t hls-analytics .
+podman build -f Containerfile.generator     -t hls-data-generator .
+podman build -f Containerfile.etl           -t hls-etl-job .
+podman build -f Containerfile.analytics-cpu -t hls-analytics .       # CPU variant
+podman build -f Containerfile.analytics     -t hls-analytics-gpu .   # GPU variant (requires NVIDIA base image)
 ```
 
 ## Analytics Output
@@ -403,7 +367,11 @@ prototype-hls/
 ├── requirements-dev.txt           # Dev/test dependencies
 ├── Containerfile.generator        # Data generator container
 ├── Containerfile.etl              # ETL job container
-├── Containerfile.analytics        # GPU analytics container
+├── Containerfile.analytics        # GPU analytics container (RAPIDS base)
+├── Containerfile.analytics-cpu    # CPU analytics container (UBI9 base)
+├── .github/
+│   └── workflows/
+│       └── build-images.yaml      # CI: build & push images to ghcr.io
 ├── db/
 │   ├── schema.sql                 # PostgreSQL DDL (edge + central)
 │   └── seed.sql                   # Facility + procedure catalog seed data

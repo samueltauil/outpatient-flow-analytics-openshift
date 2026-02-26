@@ -26,7 +26,7 @@ spec:
       restartPolicy: OnFailure
       containers:
       - name: analytics
-        image: quay.io/YOURUSER/hls-analytics:latest
+        image: ghcr.io/samueltauil/hls-analytics:latest
         args:
         - "--input"
         - "postgresql://$(CENTRAL_DB_USER):$(CENTRAL_DB_PASSWORD)@central-postgres:5432/$(CENTRAL_DB_NAME)"

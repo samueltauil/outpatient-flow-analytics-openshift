@@ -25,7 +25,7 @@ spec:
       restartPolicy: OnFailure
       containers:
       - name: generator
-        image: quay.io/YOURUSER/hls-data-generator:latest
+        image: ghcr.io/samueltauil/hls-data-generator:latest
         args:
         - "--start-date"
         - "2025-01-06"

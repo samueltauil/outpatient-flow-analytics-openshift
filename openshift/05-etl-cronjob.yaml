@@ -36,7 +36,7 @@ spec:
           restartPolicy: OnFailure
           containers:
           - name: etl
-            image: quay.io/YOURUSER/hls-etl-job:latest
+            image: ghcr.io/samueltauil/hls-etl-job:latest
             envFrom:
             - secretRef:
                 name: edge-db-remote-credentials
