@@ -23,28 +23,44 @@ logger = logging.getLogger(__name__)
 
 
 LANDING_CSS = """
-:root { --bg:#0d1117; --card:#161b22; --border:#30363d; --text:#c9d1d9;
-        --muted:#8b949e; --blue:#58a6ff; --green:#3fb950; --purple:#a78bfa; }
-* { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
-       background:var(--bg); color:var(--text); min-height:100vh; display:flex;
-       flex-direction:column; align-items:center; padding:40px 20px; }
-.logo { font-size:48px; margin-bottom:8px; }
-h1 { font-size:24px; margin-bottom:4px; }
-.sub { color:var(--muted); font-size:14px; margin-bottom:32px; }
-.card-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr));
-             gap:16px; width:100%; max-width:960px; }
-.card { background:var(--card); border:1px solid var(--border); border-radius:12px;
-        padding:24px; text-decoration:none; color:var(--text); transition:all .15s; }
-.card:hover { border-color:var(--blue); transform:translateY(-2px);
-              box-shadow:0 4px 12px rgba(88,166,255,.15); }
-.card h3 { font-size:16px; margin-bottom:8px; color:var(--blue); }
-.card .meta { color:var(--muted); font-size:13px; }
-.card .meta span { margin-right:12px; }
-.empty { color:var(--muted); font-size:16px; margin-top:40px; }
-.badge { display:inline-block; padding:2px 8px; border-radius:8px; font-size:11px;
-         font-weight:600; background:rgba(63,185,80,.15); color:var(--green); margin-left:8px; }
-.footer { color:var(--muted); font-size:12px; margin-top:auto; padding-top:40px; }
+:root { --bg:#0d1117; --surface:#161b22; --border:#30363d; --text:#c9d1d9;
+        --muted:#8b949e; --accent:#58a6ff; --green:#3fb950; --purple:#a78bfa; }
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+     background:var(--bg);color:var(--text);min-height:100vh;display:flex;
+     flex-direction:column;align-items:center;padding:48px 24px}
+
+/* Header */
+.header{text-align:center;margin-bottom:40px}
+.header h1{font-size:22px;font-weight:600;letter-spacing:-0.3px;margin-bottom:6px}
+.header .subtitle{color:var(--muted);font-size:13px}
+.header .counts{color:var(--muted);font-size:12px;margin-top:8px;display:flex;
+                justify-content:center;gap:20px}
+.header .counts span{display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.dot-html{background:var(--accent)}
+.dot-json{background:var(--purple)}
+
+/* Card grid */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));
+      gap:12px;width:100%;max-width:960px}
+a.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+       padding:20px 24px;text-decoration:none;color:var(--text);transition:border-color .15s,box-shadow .15s}
+a.card:hover{border-color:var(--accent);box-shadow:0 2px 8px rgba(88,166,255,.1)}
+.card-title{font-size:14px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.card-meta{color:var(--muted);font-size:12px;display:flex;gap:16px}
+.tag{display:inline-block;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;
+     letter-spacing:0.4px;text-transform:uppercase}
+.tag-html{background:rgba(88,166,255,.12);color:var(--accent)}
+.tag-json{background:rgba(167,139,250,.12);color:var(--purple)}
+
+/* Empty state */
+.empty{color:var(--muted);font-size:14px;margin-top:48px;text-align:center;
+       max-width:400px;line-height:1.6}
+.empty strong{color:var(--text);display:block;margin-bottom:4px}
+
+/* Footer */
+.footer{color:var(--muted);font-size:11px;margin-top:auto;padding-top:48px;letter-spacing:0.2px}
 """
 
 
@@ -60,7 +76,6 @@ def build_landing(report_dir: str) -> str:
         mtime = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
         reports.append((str(rel), f.stem, size_kb, mtime))
 
-    # Also list JSON results
     json_files = []
     for f in sorted(report_path.rglob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
         rel = f.relative_to(report_path)
@@ -73,11 +88,11 @@ def build_landing(report_dir: str) -> str:
         nice_name = name.replace("_", " ").replace("-", " ").title()
         cards_html.append(f"""
         <a class="card" href="/reports/{quote(rel)}" target="_blank">
-          <h3>📊 {html_mod.escape(nice_name)}<span class="badge">HTML</span></h3>
-          <div class="meta">
-            <span>📁 {html_mod.escape(rel)}</span>
-            <span>📏 {size_kb:.0f} KB</span>
-            <span>🕐 {mtime.strftime('%Y-%m-%d %H:%M')} UTC</span>
+          <div class="card-title">{html_mod.escape(nice_name)} <span class="tag tag-html">HTML</span></div>
+          <div class="card-meta">
+            <span>{html_mod.escape(rel)}</span>
+            <span>{size_kb:.0f} KB</span>
+            <span>{mtime.strftime('%Y-%m-%d %H:%M')} UTC</span>
           </div>
         </a>""")
 
@@ -85,33 +100,43 @@ def build_landing(report_dir: str) -> str:
         nice_name = name.replace("_", " ").replace("-", " ").title()
         cards_html.append(f"""
         <a class="card" href="/reports/{quote(rel)}" target="_blank">
-          <h3>📋 {html_mod.escape(nice_name)}<span class="badge" style="background:rgba(167,139,250,.15);color:var(--purple)">JSON</span></h3>
-          <div class="meta">
-            <span>📁 {html_mod.escape(rel)}</span>
-            <span>📏 {size_kb:.0f} KB</span>
-            <span>🕐 {mtime.strftime('%Y-%m-%d %H:%M')} UTC</span>
+          <div class="card-title">{html_mod.escape(nice_name)} <span class="tag tag-json">JSON</span></div>
+          <div class="card-meta">
+            <span>{html_mod.escape(rel)}</span>
+            <span>{size_kb:.0f} KB</span>
+            <span>{mtime.strftime('%Y-%m-%d %H:%M')} UTC</span>
           </div>
         </a>""")
 
     if not cards_html:
-        cards_html.append('<div class="empty">No reports found yet. Run the analytics pipeline first.</div>')
+        cards_html.append(
+            '<div class="empty"><strong>No reports available</strong>'
+            'Run the analytics pipeline to generate reports.</div>')
+
+    count_section = f"""
+    <div class="counts">
+      <span><span class="dot dot-html"></span>{len(reports)} report{"s" if len(reports) != 1 else ""}</span>
+      <span><span class="dot dot-json"></span>{len(json_files)} data file{"s" if len(json_files) != 1 else ""}</span>
+    </div>"""
 
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>HLS Analytics — Report Viewer</title>
+<title>Report Viewer — Outpatient Flow Analytics</title>
 <style>{LANDING_CSS}</style>
 </head>
 <body>
-  <div class="logo">🏥</div>
-  <h1>Outpatient Flow Analytics</h1>
-  <div class="sub">Report Viewer &nbsp;·&nbsp; {len(reports)} report(s) &nbsp;·&nbsp; {len(json_files)} data file(s)</div>
-  <div class="card-grid">
+  <div class="header">
+    <h1>Outpatient Flow Analytics</h1>
+    <div class="subtitle">Report Viewer</div>
+    {count_section}
+  </div>
+  <div class="grid">
     {"".join(cards_html)}
   </div>
-  <div class="footer">Outpatient Flow Analytics · OpenShift 4.21 Demo</div>
+  <div class="footer">Outpatient Flow Analytics &middot; OpenShift 4.21</div>
 </body>
 </html>"""
 
