@@ -134,13 +134,21 @@ python3 -m src.etl.batch_etl \
 Runs on the H100 GPU node with automatic CPU fallback:
 - **Aggregate metrics**: Mean/median/p90 durations, volumes, late-start rates per facility×procedure
 - **Discharge time predictor**: XGBoost regressor (MAE ~12 min, R² ~0.87)
-- **Extended recovery classifier**: XGBoost binary classifier (AUC ~0.86)
+- **Extended recovery classifier**: XGBoost binary classifier (AUC ~0.92)
 - **Operational insights**: High-variance procedures, late-start alerts, facility summaries, cancellation rates
+- **HTML report**: Self-contained interactive report with Chart.js visualisations, KPI cards, and insight tables
 
 ```bash
+# Run analytics (generates JSON + CSV + HTML report automatically)
 python3 -m src.analytics.analytics \
   --input output/cases.csv \
   --output-dir output/analytics
+
+# Or generate report standalone from existing results
+python3 -m src.analytics.report \
+  --results output/analytics/analytics_results.json \
+  --aggregates output/analytics/aggregates.csv \
+  --output output/analytics/report.html
 ```
 
 ## Data Model
@@ -411,7 +419,8 @@ prototype-hls/
 │   ├── etl/
 │   │   └── batch_etl.py           # Watermark-based ETL (edge → central)
 │   └── analytics/
-│       └── analytics.py           # GPU-accelerated analytics + ML pipeline
+│       ├── analytics.py           # GPU-accelerated analytics + ML pipeline
+│       └── report.py             # Standalone HTML report generator
 ├── openshift/
 │   ├── 00-namespaces.yaml         # edge-collector + central-analytics
 │   ├── 01-secrets.yaml            # Database credentials

@@ -372,6 +372,17 @@ def run_analytics(input_path: str, output_dir: str):
         json.dump(results, f, indent=2, default=str)
     logger.info("Analytics results written to %s", output_path)
 
+    # Generate HTML report
+    try:
+        from src.analytics.report import build_report
+        report_html = build_report(results, aggs)
+        report_path = os.path.join(output_dir, "report.html")
+        with open(report_path, "w") as f:
+            f.write(report_html)
+        logger.info("HTML report written to %s", report_path)
+    except Exception as e:
+        logger.warning("Could not generate HTML report: %s", e)
+
     return results
 
 
