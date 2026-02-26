@@ -31,6 +31,8 @@ jobs:
             containerfile: Containerfile.etl
           - image: hls-analytics
             containerfile: Containerfile.analytics-cpu
+          - image: hls-report-viewer
+            containerfile: Containerfile.viewer
 
     steps:
       - name: Checkout repository

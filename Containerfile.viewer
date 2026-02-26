@@ -1,0 +1,20 @@
+# ==============================================================================
+# Report Viewer — lightweight web UI for browsing analytics reports
+# Shares the analytics-output PVC and serves reports over HTTP
+# ==============================================================================
+FROM registry.access.redhat.com/ubi9/python-311:latest
+
+LABEL name="hls-report-viewer" \
+      version="0.1.0" \
+      description="Web UI for browsing outpatient flow analytics reports"
+
+WORKDIR /app
+
+COPY src/viewer/ src/viewer/
+COPY src/__init__.py src/__init__.py
+
+USER 1001
+EXPOSE 8080
+
+ENTRYPOINT ["python", "-m", "src.viewer.app"]
+CMD ["--report-dir", "/data/analytics", "--port", "8080"]

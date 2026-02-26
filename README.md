@@ -151,6 +151,30 @@ python3 -m src.analytics.report \
   --output output/analytics/report.html
 ```
 
+#### Sample Report Output
+
+<p align="center">
+  <img src="docs/report-screenshot.png" alt="Analytics HTML Report" width="100%"/>
+</p>
+
+### 4. Report Viewer (`src/viewer/`)
+
+Lightweight web UI for browsing and viewing analytics reports:
+- **Zero dependencies** — uses Python's built-in `http.server`
+- **Auto-discovers** all HTML reports and JSON data files in the output directory
+- **Health endpoint** (`/healthz`) for Kubernetes readiness probes
+- Deployed as a pod with an OpenShift Route for browser access
+
+<p align="center">
+  <img src="docs/viewer-screenshot.png" alt="Report Viewer Landing Page" width="80%"/>
+</p>
+
+```bash
+# Run locally
+python3 -m src.viewer.app --report-dir output/analytics --port 8080
+# Open http://localhost:8080 in browser
+```
+
 ## Data Model
 
 ### Core Tables
@@ -210,6 +234,7 @@ Pre-built images are published to GitHub Container Registry and used by the Open
 | [`ghcr.io/samueltauil/hls-etl-job`](https://ghcr.io/samueltauil/hls-etl-job) | ETL batch job | `Containerfile.etl` |
 | [`ghcr.io/samueltauil/hls-analytics`](https://ghcr.io/samueltauil/hls-analytics) | Analytics pipeline (CPU fallback) | `Containerfile.analytics-cpu` |
 | [`ghcr.io/samueltauil/hls-analytics-gpu`](https://ghcr.io/samueltauil/hls-analytics-gpu) | **Analytics pipeline (RAPIDS + CUDA 12)** | `Containerfile.analytics` |
+| [`ghcr.io/samueltauil/hls-report-viewer`](https://ghcr.io/samueltauil/hls-report-viewer) | Report viewer web UI | `Containerfile.viewer` |
 
 > **GPU image**: `hls-analytics-gpu` is built from the NVIDIA RAPIDS 26.02 base image with cuDF,
 > cuML, and XGBoost GPU support pre-installed (~8 GB). The OpenShift GPU job manifest
@@ -230,6 +255,7 @@ Images are automatically rebuilt on every push to `main` via GitHub Actions (`.g
 | `05-etl-cronjob.yaml`         | CronJob running every 4 hours (`0 */4 * * *`)        |
 | `06-gpu-analytics-job.yaml`   | GPU-pinned analytics Job with nvidia.com/gpu resource |
 | `07-network-policies.yaml`    | Cross-namespace ETL access + internal-only central DB |
+| `08-report-viewer.yaml`       | Report viewer Deployment + Service + Route            |
 
 ### Step-by-Step Deployment
 
@@ -406,6 +432,7 @@ prototype-hls/
 ├── Containerfile.etl              # ETL job container
 ├── Containerfile.analytics        # GPU analytics container (RAPIDS base)
 ├── Containerfile.analytics-cpu    # CPU analytics container (UBI9 base)
+├── Containerfile.viewer           # Report viewer container
 ├── .github/
 │   └── workflows/
 │       └── build-images.yaml      # CI: build & push images to ghcr.io
@@ -421,6 +448,8 @@ prototype-hls/
 │   └── analytics/
 │       ├── analytics.py           # GPU-accelerated analytics + ML pipeline
 │       └── report.py             # Standalone HTML report generator
+│   └── viewer/
+│       └── app.py               # Report viewer web UI
 ├── openshift/
 │   ├── 00-namespaces.yaml         # edge-collector + central-analytics
 │   ├── 01-secrets.yaml            # Database credentials
@@ -429,7 +458,8 @@ prototype-hls/
 │   ├── 04-data-generator-job.yaml # One-time data seeding job
 │   ├── 05-etl-cronjob.yaml        # 4-hour ETL CronJob
 │   ├── 06-gpu-analytics-job.yaml  # GPU-pinned analytics job
-│   └── 07-network-policies.yaml   # Cross-namespace network policies
+│   ├── 07-network-policies.yaml   # Cross-namespace network policies
+│   └── 08-report-viewer.yaml     # Report viewer Deployment + Route
 ├── tests/
 │   ├── test_catalog.py            # Procedure catalog validation
 │   ├── test_generator.py          # Data generator unit tests
