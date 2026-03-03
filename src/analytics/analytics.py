@@ -179,7 +179,7 @@ def train_discharge_predictor(df: pd.DataFrame, feature_cols: List[str]) -> Opti
     }
 
     if GPU_AVAILABLE:
-        params["tree_method"] = "gpu_hist"
+        params["tree_method"] = "hist"
         params["device"] = "cuda"
         logger.info("Training discharge predictor with GPU acceleration")
     else:
@@ -241,7 +241,7 @@ def train_extended_recovery_classifier(df: pd.DataFrame, feature_cols: List[str]
         "random_state": 42,
     }
     if GPU_AVAILABLE:
-        params["tree_method"] = "gpu_hist"
+        params["tree_method"] = "hist"
         params["device"] = "cuda"
 
     model = xgb.XGBClassifier(**params)

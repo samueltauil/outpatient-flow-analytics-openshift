@@ -19,16 +19,18 @@ spec:
       labels:
         app: report-viewer
     spec:
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-            - matchExpressions:
-              - key: nvidia.com/gpu.present
-                operator: DoesNotExist
+      serviceAccountName: report-viewer-sa
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
       containers:
       - name: viewer
         image: ghcr.io/samueltauil/hls-report-viewer:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          readOnlyRootFilesystem: true
         args: ["--report-dir", "/data/analytics", "--port", "8080"]
         ports:
         - containerPort: 8080

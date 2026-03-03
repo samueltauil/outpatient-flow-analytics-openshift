@@ -16,6 +16,13 @@ spec:
       labels:
         app: gpu-analytics
     spec:
+      serviceAccountName: gpu-analytics-sa
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
       # Pin to GPU node
       nodeSelector:
         nvidia.com/gpu.present: "true"
@@ -27,14 +34,31 @@ spec:
       containers:
       - name: analytics
         image: ghcr.io/samueltauil/hls-analytics-gpu:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
         args:
         - "--input"
         - "postgresql://$(CENTRAL_DB_USER):$(CENTRAL_DB_PASSWORD)@central-postgres:5432/$(CENTRAL_DB_NAME)"
         - "--output-dir"
         - "/data/analytics"
-        envFrom:
-        - secretRef:
-            name: central-db-credentials
+        env:
+        - name: CENTRAL_DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: central-db-credentials
+              key: POSTGRES_USER
+        - name: CENTRAL_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: central-db-credentials
+              key: POSTGRES_PASSWORD
+        - name: CENTRAL_DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: central-db-credentials
+              key: POSTGRES_DB
         volumeMounts:
         - name: analytics-output
           mountPath: /data/analytics

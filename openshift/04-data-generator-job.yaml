@@ -15,6 +15,10 @@ spec:
       labels:
         app: data-generator
     spec:
+      serviceAccountName: data-generator-sa
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -26,6 +30,10 @@ spec:
       containers:
       - name: generator
         image: ghcr.io/samueltauil/hls-data-generator:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
         args:
         - "--start-date"
         - "2025-01-06"

@@ -26,6 +26,10 @@ spec:
           labels:
             app: etl-job
         spec:
+          serviceAccountName: etl-job-sa
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
           affinity:
             nodeAffinity:
               requiredDuringSchedulingIgnoredDuringExecution:
@@ -37,6 +41,10 @@ spec:
           containers:
           - name: etl
             image: ghcr.io/samueltauil/hls-etl-job:latest
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop: ["ALL"]
             envFrom:
             - secretRef:
                 name: edge-db-remote-credentials
