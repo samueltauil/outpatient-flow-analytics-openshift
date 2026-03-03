@@ -1,11 +1,13 @@
 # Tekton Tasks — all in central-analytics namespace
 # Tasks that access edge DB use the cross-namespace service DNS and remote credentials
 ---
-# Task 1: Generate synthetic data → CSV in shared workspace
+# Task 1: Generate synthetic data AND load into edge PostgreSQL
+# Combined into a single task so data sharing works with emptyDir
+# (OpenShift console defaults workspaces to emptyDir)
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
-  name: generate-data
+  name: generate-and-load
   namespace: central-analytics
   labels:
     app.kubernetes.io/part-of: hls-demo
@@ -15,8 +17,6 @@ spec:
     type: string
   - name: end-date
     type: string
-  workspaces:
-  - name: shared-data
   steps:
   - name: generate
     image: ghcr.io/samueltauil/hls-data-generator:latest
@@ -26,13 +26,16 @@ spec:
     - "--end-date"
     - "$(params.end-date)"
     - "--output"
-    - "$(workspaces.shared-data.path)/cases.csv"
+    - "/shared/cases.csv"
     - "--format"
     - "csv"
     securityContext:
       allowPrivilegeEscalation: false
       capabilities:
         drop: ["ALL"]
+    volumeMounts:
+    - name: step-shared
+      mountPath: /shared
     computeResources:
       requests:
         memory: "512Mi"
@@ -40,19 +43,6 @@ spec:
       limits:
         memory: "1Gi"
         cpu: "1"
----
-# Task 2: Load CSV → edge PostgreSQL (via cross-namespace DNS)
-apiVersion: tekton.dev/v1
-kind: Task
-metadata:
-  name: load-csv-to-edge-db
-  namespace: central-analytics
-  labels:
-    app.kubernetes.io/part-of: hls-demo
-spec:
-  workspaces:
-  - name: shared-data
-  steps:
   - name: load
     image: ghcr.io/samueltauil/hls-data-generator:latest
     env:
@@ -85,6 +75,9 @@ spec:
       allowPrivilegeEscalation: false
       capabilities:
         drop: ["ALL"]
+    volumeMounts:
+    - name: step-shared
+      mountPath: /shared
     computeResources:
       requests:
         memory: "256Mi"
@@ -107,7 +100,7 @@ spec:
       col_str = ",".join(cols)
       placeholders = ",".join(["%s"]*len(cols))
       sql = f"INSERT INTO outpatient_case_event ({col_str}) VALUES ({placeholders}) ON CONFLICT DO NOTHING"
-      csv_path = "$(workspaces.shared-data.path)/cases.csv"
+      csv_path = "/shared/cases.csv"
       with open(csv_path) as f:
           reader = csv.DictReader(f)
           batch, total = [], 0
@@ -127,8 +120,11 @@ spec:
       cur.close()
       conn.close()
       print(f"Done — loaded {total} rows into edge DB.", flush=True)
+  volumes:
+  - name: step-shared
+    emptyDir: {}
 ---
-# Task 3: ETL — edge → central
+# Task 2: ETL — edge → central
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
@@ -177,7 +173,9 @@ spec:
         memory: "512Mi"
         cpu: "500m"
 ---
-# Task 4: GPU Analytics on H100
+# Task 3: GPU Analytics on H100
+# Uses the pre-existing analytics-output-pvc directly (no workspace needed)
+# so it works whether triggered from CLI or OpenShift console
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
@@ -186,8 +184,10 @@ metadata:
   labels:
     app.kubernetes.io/part-of: hls-demo
 spec:
-  workspaces:
-  - name: analytics-output
+  stepTemplate:
+    securityContext:
+      runAsUser: 1001
+      runAsGroup: 1001
   steps:
   - name: analytics
     image: ghcr.io/samueltauil/hls-analytics-gpu:latest
@@ -211,7 +211,10 @@ spec:
     - "--input"
     - "postgresql://$(CENTRAL_DB_USER):$(CENTRAL_DB_PASSWORD)@central-postgres:5432/$(CENTRAL_DB_NAME)"
     - "--output-dir"
-    - "$(workspaces.analytics-output.path)"
+    - "/output"
+    volumeMounts:
+    - name: analytics-output
+      mountPath: /output
     computeResources:
       requests:
         memory: "8Gi"
@@ -221,3 +224,8 @@ spec:
         memory: "32Gi"
         cpu: "8"
         nvidia.com/gpu: "1"
+  sidecars: []
+  volumes:
+  - name: analytics-output
+    persistentVolumeClaim:
+      claimName: analytics-output-pvc

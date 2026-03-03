@@ -1,6 +1,9 @@
 # Tekton Pipeline — end-to-end outpatient analytics
 # Accepts start-date and end-date, orchestrates:
-#   generate → load-to-db → etl → gpu-analytics
+#   generate-and-load → etl → gpu-analytics
+# No workspaces required — tasks handle storage internally:
+#   - generate+load share data via Tekton step volumes (same pod)
+#   - gpu-analytics mounts analytics-output-pvc directly
 ---
 apiVersion: tekton.dev/v1
 kind: Pipeline
@@ -19,45 +22,25 @@ spec:
     type: string
     description: End date for synthetic data (YYYY-MM-DD)
     default: "2025-03-31"
-  workspaces:
-  - name: shared-data
-    description: Workspace for CSV data (edge-collector PVC)
-  - name: analytics-output
-    description: Workspace for analytics results (central PVC)
   tasks:
-  # Stage 1: Generate synthetic data
-  - name: generate
+  # Stage 1: Generate synthetic data AND load into edge DB
+  - name: generate-and-load
     taskRef:
-      name: generate-data
+      name: generate-and-load
     params:
     - name: start-date
       value: "$(params.start-date)"
     - name: end-date
       value: "$(params.end-date)"
-    workspaces:
-    - name: shared-data
-      workspace: shared-data
 
-  # Stage 2: Load CSV into edge PostgreSQL
-  - name: load-to-db
-    runAfter: ["generate"]
-    taskRef:
-      name: load-csv-to-edge-db
-    workspaces:
-    - name: shared-data
-      workspace: shared-data
-
-  # Stage 3: ETL — transfer edge → central
+  # Stage 2: ETL — transfer edge → central
   - name: etl
-    runAfter: ["load-to-db"]
+    runAfter: ["generate-and-load"]
     taskRef:
       name: run-etl
 
-  # Stage 4: GPU analytics on H100
+  # Stage 3: GPU analytics on H100
   - name: gpu-analytics
     runAfter: ["etl"]
     taskRef:
       name: run-gpu-analytics
-    workspaces:
-    - name: analytics-output
-      workspace: analytics-output
