@@ -1,0 +1,63 @@
+# Tekton Pipeline — end-to-end outpatient analytics
+# Accepts start-date and end-date, orchestrates:
+#   generate → load-to-db → etl → gpu-analytics
+---
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: outpatient-analytics
+  namespace: central-analytics
+  labels:
+    app.kubernetes.io/part-of: hls-demo
+spec:
+  params:
+  - name: start-date
+    type: string
+    description: Start date for synthetic data (YYYY-MM-DD)
+    default: "2025-01-06"
+  - name: end-date
+    type: string
+    description: End date for synthetic data (YYYY-MM-DD)
+    default: "2025-03-31"
+  workspaces:
+  - name: shared-data
+    description: Workspace for CSV data (edge-collector PVC)
+  - name: analytics-output
+    description: Workspace for analytics results (central PVC)
+  tasks:
+  # Stage 1: Generate synthetic data
+  - name: generate
+    taskRef:
+      name: generate-data
+    params:
+    - name: start-date
+      value: "$(params.start-date)"
+    - name: end-date
+      value: "$(params.end-date)"
+    workspaces:
+    - name: shared-data
+      workspace: shared-data
+
+  # Stage 2: Load CSV into edge PostgreSQL
+  - name: load-to-db
+    runAfter: ["generate"]
+    taskRef:
+      name: load-csv-to-edge-db
+    workspaces:
+    - name: shared-data
+      workspace: shared-data
+
+  # Stage 3: ETL — transfer edge → central
+  - name: etl
+    runAfter: ["load-to-db"]
+    taskRef:
+      name: run-etl
+
+  # Stage 4: GPU analytics on H100
+  - name: gpu-analytics
+    runAfter: ["etl"]
+    taskRef:
+      name: run-gpu-analytics
+    workspaces:
+    - name: analytics-output
+      workspace: analytics-output

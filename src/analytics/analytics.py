@@ -181,13 +181,15 @@ def train_discharge_predictor(df: pd.DataFrame, feature_cols: List[str]) -> Opti
     if GPU_AVAILABLE:
         params["tree_method"] = "hist"
         params["device"] = "cuda"
+        params["n_estimators"] = 500
+        params["max_depth"] = 8
         logger.info("Training discharge predictor with GPU acceleration")
     else:
         params["tree_method"] = "hist"
         logger.info("Training discharge predictor on CPU")
 
     model = xgb.XGBRegressor(**params)
-    model.fit(X_train, y_train)
+    model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=False)
 
     y_pred = model.predict(X_test)
     mae = mean_absolute_error(y_test, y_pred)
@@ -243,9 +245,11 @@ def train_extended_recovery_classifier(df: pd.DataFrame, feature_cols: List[str]
     if GPU_AVAILABLE:
         params["tree_method"] = "hist"
         params["device"] = "cuda"
+        params["n_estimators"] = 500
+        params["max_depth"] = 8
 
     model = xgb.XGBClassifier(**params)
-    model.fit(X_train, y_train)
+    model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=False)
 
     y_prob = model.predict_proba(X_test)[:, 1]
     try:
@@ -511,6 +515,46 @@ def generate_insights(df: pd.DataFrame, aggs: pd.DataFrame) -> List[Dict]:
     return insights
 
 
+def _run_gpu_hyperparam_sweep(df: pd.DataFrame, feature_cols: List[str]):
+    """Run a GPU-intensive hyperparameter sweep to exercise GPU compute.
+
+    Trains multiple XGBoost models with varying depth/estimators to sustain
+    GPU utilization long enough to register on DCGM dashboards.
+    """
+    target = "dur_total"
+    valid = df.dropna(subset=feature_cols + [target])
+    if len(valid) < 100:
+        return
+
+    X = valid[feature_cols].values
+    y = valid[target].values
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    configs = [
+        {"max_depth": 6, "n_estimators": 800, "learning_rate": 0.05},
+        {"max_depth": 10, "n_estimators": 1000, "learning_rate": 0.03},
+        {"max_depth": 12, "n_estimators": 600, "learning_rate": 0.1, "subsample": 0.7},
+        {"max_depth": 8, "n_estimators": 1200, "learning_rate": 0.02, "colsample_bytree": 0.6},
+    ]
+    best_mae = float("inf")
+    for i, cfg in enumerate(configs):
+        params = {
+            "objective": "reg:squarederror",
+            "tree_method": "hist",
+            "device": "cuda",
+            "random_state": 42,
+            **cfg,
+        }
+        model = xgb.XGBRegressor(**params)
+        model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=False)
+        mae = mean_absolute_error(y_test, model.predict(X_test))
+        logger.info("  Sweep %d/%d: depth=%d est=%d lr=%.3f → MAE=%.2f",
+                     i + 1, len(configs), cfg["max_depth"], cfg["n_estimators"],
+                     cfg["learning_rate"], mae)
+        best_mae = min(best_mae, mae)
+    logger.info("GPU sweep complete — best MAE=%.2f min", best_mae)
+
+
 def run_analytics(input_path: str, output_dir: str):
     """Run the full analytics pipeline."""
     os.makedirs(output_dir, exist_ok=True)
@@ -536,6 +580,11 @@ def run_analytics(input_path: str, output_dir: str):
         recovery_result = train_extended_recovery_classifier(prepared, feature_cols)
         if recovery_result:
             results["extended_recovery_classifier"] = recovery_result
+
+        # GPU-intensive hyperparameter sweep to exercise the GPU
+        if GPU_AVAILABLE and XGB_AVAILABLE:
+            logger.info("Running GPU hyperparameter sweep (drives GPU utilization)...")
+            _run_gpu_hyperparam_sweep(prepared, feature_cols)
     else:
         logger.warning("scikit-learn not available, skipping ML models")
 

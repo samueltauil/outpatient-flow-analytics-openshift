@@ -1,0 +1,55 @@
+# PVC for shared pipeline workspace (CSV data between generate and load steps)
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pipeline-shared-data
+  namespace: central-analytics
+  labels:
+    app.kubernetes.io/part-of: hls-demo
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+# PipelineRun — trigger the full pipeline with custom date range
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: analytics-run-
+  namespace: central-analytics
+  labels:
+    app.kubernetes.io/part-of: hls-demo
+spec:
+  pipelineRef:
+    name: outpatient-analytics
+  taskRunTemplate:
+    serviceAccountName: pipeline-sa
+  params:
+  - name: start-date
+    value: "2025-01-06"
+  - name: end-date
+    value: "2025-03-31"
+  workspaces:
+  - name: shared-data
+    persistentVolumeClaim:
+      claimName: pipeline-shared-data
+  - name: analytics-output
+    persistentVolumeClaim:
+      claimName: analytics-output-pvc
+  taskRunSpecs:
+  - pipelineTaskName: gpu-analytics
+    podTemplate:
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001

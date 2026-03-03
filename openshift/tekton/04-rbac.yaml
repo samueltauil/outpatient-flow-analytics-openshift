@@ -1,0 +1,13 @@
+# RBAC for Tekton Pipeline ServiceAccount
+# Grants the pipeline SA access to secrets and ability to schedule GPU pods
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pipeline-sa
+  namespace: central-analytics
+  labels:
+    app.kubernetes.io/part-of: hls-demo
+---
+# Grant nonroot-v2 SCC so the GPU analytics step can run as UID 1001 (RAPIDS image)
+# Applied via: oc adm policy add-scc-to-user nonroot-v2 -z pipeline-sa -n central-analytics

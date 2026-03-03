@@ -1,0 +1,223 @@
+# Tekton Tasks — all in central-analytics namespace
+# Tasks that access edge DB use the cross-namespace service DNS and remote credentials
+---
+# Task 1: Generate synthetic data → CSV in shared workspace
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: generate-data
+  namespace: central-analytics
+  labels:
+    app.kubernetes.io/part-of: hls-demo
+spec:
+  params:
+  - name: start-date
+    type: string
+  - name: end-date
+    type: string
+  workspaces:
+  - name: shared-data
+  steps:
+  - name: generate
+    image: ghcr.io/samueltauil/hls-data-generator:latest
+    args:
+    - "--start-date"
+    - "$(params.start-date)"
+    - "--end-date"
+    - "$(params.end-date)"
+    - "--output"
+    - "$(workspaces.shared-data.path)/cases.csv"
+    - "--format"
+    - "csv"
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "500m"
+      limits:
+        memory: "1Gi"
+        cpu: "1"
+---
+# Task 2: Load CSV → edge PostgreSQL (via cross-namespace DNS)
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: load-csv-to-edge-db
+  namespace: central-analytics
+  labels:
+    app.kubernetes.io/part-of: hls-demo
+spec:
+  workspaces:
+  - name: shared-data
+  steps:
+  - name: load
+    image: ghcr.io/samueltauil/hls-data-generator:latest
+    env:
+    - name: EDGE_DB_HOST
+      valueFrom:
+        secretKeyRef:
+          name: edge-db-remote-credentials
+          key: EDGE_DB_HOST
+    - name: EDGE_DB_PORT
+      valueFrom:
+        secretKeyRef:
+          name: edge-db-remote-credentials
+          key: EDGE_DB_PORT
+    - name: EDGE_DB_NAME
+      valueFrom:
+        secretKeyRef:
+          name: edge-db-remote-credentials
+          key: EDGE_DB_NAME
+    - name: EDGE_DB_USER
+      valueFrom:
+        secretKeyRef:
+          name: edge-db-remote-credentials
+          key: EDGE_DB_USER
+    - name: EDGE_DB_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: edge-db-remote-credentials
+          key: EDGE_DB_PASSWORD
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    script: |
+      #!/usr/bin/env python
+      import csv, os, psycopg2
+      db_url = f"postgresql://{os.environ['EDGE_DB_USER']}:{os.environ['EDGE_DB_PASSWORD']}@{os.environ['EDGE_DB_HOST']}:{os.environ['EDGE_DB_PORT']}/{os.environ['EDGE_DB_NAME']}"
+      conn = psycopg2.connect(db_url)
+      cur = conn.cursor()
+      cur.execute("TRUNCATE outpatient_case_event")
+      conn.commit()
+      cols = ["event_id","facility_id","procedure_type","scheduled_start_time",
+              "checkin_time","preop_start_time","op_start_time","postop_start_time",
+              "discharge_time","anesthesia_type","asa_class","case_status",
+              "created_at","source_generator_id"]
+      col_str = ",".join(cols)
+      placeholders = ",".join(["%s"]*len(cols))
+      sql = f"INSERT INTO outpatient_case_event ({col_str}) VALUES ({placeholders}) ON CONFLICT DO NOTHING"
+      csv_path = "$(workspaces.shared-data.path)/cases.csv"
+      with open(csv_path) as f:
+          reader = csv.DictReader(f)
+          batch, total = [], 0
+          for row in reader:
+              vals = [row.get(c) or None for c in cols]
+              batch.append(vals)
+              if len(batch) >= 500:
+                  cur.executemany(sql, batch)
+                  conn.commit()
+                  total += len(batch)
+                  print(f"Loaded {total} rows...", flush=True)
+                  batch = []
+          if batch:
+              cur.executemany(sql, batch)
+              conn.commit()
+              total += len(batch)
+      cur.close()
+      conn.close()
+      print(f"Done — loaded {total} rows into edge DB.", flush=True)
+---
+# Task 3: ETL — edge → central
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: run-etl
+  namespace: central-analytics
+  labels:
+    app.kubernetes.io/part-of: hls-demo
+spec:
+  steps:
+  - name: etl
+    image: ghcr.io/samueltauil/hls-etl-job:latest
+    envFrom:
+    - secretRef:
+        name: edge-db-remote-credentials
+    - secretRef:
+        name: central-db-credentials
+    env:
+    - name: CENTRAL_DB_HOST
+      value: "central-postgres"
+    - name: CENTRAL_DB_PORT
+      value: "5432"
+    - name: CENTRAL_DB_NAME
+      valueFrom:
+        secretKeyRef:
+          name: central-db-credentials
+          key: POSTGRES_DB
+    - name: CENTRAL_DB_USER
+      valueFrom:
+        secretKeyRef:
+          name: central-db-credentials
+          key: POSTGRES_USER
+    - name: CENTRAL_DB_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: central-db-credentials
+          key: POSTGRES_PASSWORD
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+---
+# Task 4: GPU Analytics on H100
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: run-gpu-analytics
+  namespace: central-analytics
+  labels:
+    app.kubernetes.io/part-of: hls-demo
+spec:
+  workspaces:
+  - name: analytics-output
+  steps:
+  - name: analytics
+    image: ghcr.io/samueltauil/hls-analytics-gpu:latest
+    env:
+    - name: CENTRAL_DB_USER
+      valueFrom:
+        secretKeyRef:
+          name: central-db-credentials
+          key: POSTGRES_USER
+    - name: CENTRAL_DB_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: central-db-credentials
+          key: POSTGRES_PASSWORD
+    - name: CENTRAL_DB_NAME
+      valueFrom:
+        secretKeyRef:
+          name: central-db-credentials
+          key: POSTGRES_DB
+    args:
+    - "--input"
+    - "postgresql://$(CENTRAL_DB_USER):$(CENTRAL_DB_PASSWORD)@central-postgres:5432/$(CENTRAL_DB_NAME)"
+    - "--output-dir"
+    - "$(workspaces.analytics-output.path)"
+    resources:
+      requests:
+        memory: "4Gi"
+        cpu: "2"
+        nvidia.com/gpu: "1"
+      limits:
+        memory: "16Gi"
+        cpu: "8"
+        nvidia.com/gpu: "1"
