@@ -33,7 +33,7 @@ spec:
       allowPrivilegeEscalation: false
       capabilities:
         drop: ["ALL"]
-    resources:
+    computeResources:
       requests:
         memory: "512Mi"
         cpu: "500m"
@@ -85,7 +85,7 @@ spec:
       allowPrivilegeEscalation: false
       capabilities:
         drop: ["ALL"]
-    resources:
+    computeResources:
       requests:
         memory: "256Mi"
         cpu: "250m"
@@ -169,7 +169,7 @@ spec:
       allowPrivilegeEscalation: false
       capabilities:
         drop: ["ALL"]
-    resources:
+    computeResources:
       requests:
         memory: "256Mi"
         cpu: "250m"
@@ -212,7 +212,7 @@ spec:
     - "postgresql://$(CENTRAL_DB_USER):$(CENTRAL_DB_PASSWORD)@central-postgres:5432/$(CENTRAL_DB_NAME)"
     - "--output-dir"
     - "$(workspaces.analytics-output.path)"
-    resources:
+    computeResources:
       requests:
         memory: "8Gi"
         cpu: "2"
