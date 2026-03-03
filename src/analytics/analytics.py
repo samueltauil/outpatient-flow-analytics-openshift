@@ -518,9 +518,10 @@ def generate_insights(df: pd.DataFrame, aggs: pd.DataFrame) -> List[Dict]:
 def _run_gpu_hyperparam_sweep(df: pd.DataFrame, feature_cols: List[str]):
     """Run a GPU-intensive hyperparameter sweep to exercise GPU compute.
 
-    Trains multiple XGBoost models with varying depth/estimators to sustain
-    GPU utilization long enough to register on DCGM dashboards.
+    Trains multiple XGBoost models sequentially with explicit cleanup between
+    runs to sustain GPU utilization while staying within memory limits.
     """
+    import gc
     target = "dur_total"
     valid = df.dropna(subset=feature_cols + [target])
     if len(valid) < 100:
@@ -552,6 +553,8 @@ def _run_gpu_hyperparam_sweep(df: pd.DataFrame, feature_cols: List[str]):
                      i + 1, len(configs), cfg["max_depth"], cfg["n_estimators"],
                      cfg["learning_rate"], mae)
         best_mae = min(best_mae, mae)
+        del model
+        gc.collect()
     logger.info("GPU sweep complete — best MAE=%.2f min", best_mae)
 
 

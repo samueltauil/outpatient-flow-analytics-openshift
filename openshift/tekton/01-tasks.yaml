@@ -214,10 +214,10 @@ spec:
     - "$(workspaces.analytics-output.path)"
     resources:
       requests:
-        memory: "4Gi"
+        memory: "8Gi"
         cpu: "2"
         nvidia.com/gpu: "1"
       limits:
-        memory: "16Gi"
+        memory: "32Gi"
         cpu: "8"
         nvidia.com/gpu: "1"

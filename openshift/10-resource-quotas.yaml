@@ -71,4 +71,4 @@ spec:
       memory: "128Mi"
     max:
       cpu: "10"
-      memory: "20Gi"
+      memory: "40Gi"
