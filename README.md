@@ -12,6 +12,10 @@
 
 ## Architecture Overview
 
+<p align="center">
+  <img src="docs/outpatient-analytics-overview.png" alt="Analytics Overview" width="100%"/>
+</p>
+
 ```mermaid
 %%{init: {'theme': 'dark', 'themeVariables': { 'fontSize': '14px', 'fontFamily': 'Segoe UI, Helvetica, sans-serif', 'lineColor': '#8B949E' }}}%%
 
