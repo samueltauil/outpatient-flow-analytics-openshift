@@ -60,6 +60,25 @@ Admin password (if not using OpenShift SSO):
 oc extract secret/openshift-gitops-cluster -n openshift-gitops --to=-
 ```
 
+## Looking up CRD field details
+
+When you need to understand specific configuration fields, enum values, defaults, or nested structures, use the lookup script to query the full OpenAPI schemas in `openshift/crds/openshift-gitops-operator/`:
+
+```bash
+# List all available CRDs
+bash .github/skills/openshift-gitops/scripts/lookup-crd.sh
+
+# Show top-level spec fields for ArgoCD
+bash .github/skills/openshift-gitops/scripts/lookup-crd.sh argocds
+
+# Drill into nested fields
+bash .github/skills/openshift-gitops/scripts/lookup-crd.sh argocds spec.server
+bash .github/skills/openshift-gitops/scripts/lookup-crd.sh argocds spec.rbac
+bash .github/skills/openshift-gitops/scripts/lookup-crd.sh applications spec.syncPolicy
+```
+
+See [references/crd-summary.md](references/crd-summary.md) for a quick overview of all fields.
+
 ## Key CRDs
 
 Full schemas are in `openshift/crds/openshift-gitops-operator/`. Key CRDs:

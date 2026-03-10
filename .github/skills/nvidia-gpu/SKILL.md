@@ -143,6 +143,26 @@ oc wait --for=condition=Ready pod -l app=nvidia-operator-validator \
   -n nvidia-gpu-operator --timeout=600s
 ```
 
+## Looking up CRD field details
+
+When you need to understand specific configuration fields, enum values, defaults, or nested structures, use the lookup script to query the full OpenAPI schemas in `openshift/crds/gpu-operator-certified/`:
+
+```bash
+# List all available CRDs
+bash .github/skills/nvidia-gpu/scripts/lookup-crd.sh
+
+# Show top-level spec fields for ClusterPolicy
+bash .github/skills/nvidia-gpu/scripts/lookup-crd.sh clusterpolicies
+
+# Drill into nested fields
+bash .github/skills/nvidia-gpu/scripts/lookup-crd.sh clusterpolicies spec.driver
+bash .github/skills/nvidia-gpu/scripts/lookup-crd.sh clusterpolicies spec.dcgmExporter
+bash .github/skills/nvidia-gpu/scripts/lookup-crd.sh clusterpolicies spec.mig
+bash .github/skills/nvidia-gpu/scripts/lookup-crd.sh nvidiadrivers spec
+```
+
+See [references/crd-summary.md](references/crd-summary.md) for a quick overview of all fields.
+
 ## Key CRDs
 
 Full schemas are in `openshift/crds/gpu-operator-certified/`. Key CRDs:

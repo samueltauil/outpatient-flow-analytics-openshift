@@ -65,6 +65,24 @@ oc get pods -n openshift-pipelines -l app=tekton-pipelines-controller
 # Expected: Running
 ```
 
+## Looking up CRD field details
+
+When you need to understand specific configuration fields, enum values, defaults, or nested structures, use the lookup script to query the full OpenAPI schemas in `openshift/crds/openshift-pipelines-operator-rh/`:
+
+```bash
+# List all available CRDs
+bash .github/skills/openshift-pipelines/scripts/lookup-crd.sh
+
+# Show top-level spec fields for TektonConfig
+bash .github/skills/openshift-pipelines/scripts/lookup-crd.sh tektonconfigs
+
+# Drill into nested fields
+bash .github/skills/openshift-pipelines/scripts/lookup-crd.sh tektonconfigs spec.pipeline
+bash .github/skills/openshift-pipelines/scripts/lookup-crd.sh tektonchains spec.artifacts
+```
+
+See [references/crd-summary.md](references/crd-summary.md) for a quick overview of all fields.
+
 ## Key CRDs
 
 Full schemas are in `openshift/crds/openshift-pipelines-operator-rh/`. Key CRDs:

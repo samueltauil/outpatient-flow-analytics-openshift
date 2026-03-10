@@ -20,8 +20,9 @@ read the corresponding `SKILL.md` for full instructions and use the bundled `scr
 1. **Read the SKILL.md** in the matching skill directory to understand the full procedure.
 2. **Run `scripts/install.sh`** to install the operator. The script is idempotent — safe to re-run.
 3. **Run `scripts/verify.sh`** to check health. Returns exit code 0 if healthy, non-zero with diagnostics if not.
-4. **Read `references/crd-summary.md`** for CRD field-level documentation when configuring custom resources.
-5. **Full CRD schemas** are in `openshift/crds/` if you need the complete OpenAPI validation spec.
+4. **Run `scripts/lookup-crd.sh <crd> [field.path]`** to query detailed CRD field info (types, enums, defaults, nested fields) from the full OpenAPI schemas in `openshift/crds/`.
+5. **Read `references/crd-summary.md`** for a quick overview of CRD fields.
+6. **Full CRD schemas** are in `openshift/crds/` if you need the raw YAML.
 
 ### Operator dependency order
 

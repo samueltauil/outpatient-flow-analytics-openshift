@@ -166,6 +166,24 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 ```
 
+## Looking up CRD field details
+
+When you need to understand specific configuration fields, enum values, defaults, or nested structures, use the lookup script to query the full OpenAPI schemas in `openshift/crds/nfd/`:
+
+```bash
+# List all available CRDs
+bash .github/skills/nfd/scripts/lookup-crd.sh
+
+# Show top-level spec fields for NodeFeatureDiscovery
+bash .github/skills/nfd/scripts/lookup-crd.sh nodefeaturediscoveries
+
+# Drill into nested fields
+bash .github/skills/nfd/scripts/lookup-crd.sh nodefeaturediscoveries spec.workerConfig
+bash .github/skills/nfd/scripts/lookup-crd.sh nodefeaturerules spec.rules
+```
+
+See [references/crd-summary.md](references/crd-summary.md) for a quick overview of all fields.
+
 ## Key CRDs
 
 Full schemas are in `openshift/crds/nfd/`. Key CRDs:
