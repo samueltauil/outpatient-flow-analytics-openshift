@@ -9,16 +9,18 @@ description: >
 compatibility: Requires OpenShift 4.14+ with cluster-admin access and oc CLI.
 ---
 
-# Node Feature Discovery (NFD) Operator
+# Node Feature Discovery (NFD) — Troubleshooting & Configuration
 
 ## When to use this skill
 
-Use this skill when:
-- Diagnosing missing GPU node labels (`feature.node.kubernetes.io/pci-10de.present=true`)
-- Troubleshooting NFD worker pods not running or in CrashLoopBackOff
-- Investigating GPU node detection failures (PCI class configuration)
-- Debugging RBAC/permission issues with NodeFeature or NodeFeatureRule resources
-- Tuning worker config (sleep interval, PCI device filters)
+Use this skill when troubleshooting:
+- Missing GPU labels — nodes should have `feature.node.kubernetes.io/pci-10de.present=true`
+- NFD worker pods not running or stuck in CrashLoopBackOff
+- PCI class configuration issues — classes `03` (display controller) and `12` (processing accelerator) are required for NVIDIA GPUs
+- RBAC/permission issues — workers unable to create NodeFeature resources, masters unable to list NodeFeatureRules
+- Tuning worker config — sleep interval, PCI device class whitelist, device label fields
+
+Also useful for:
 - Creating custom NodeFeatureRules for advanced label logic
 - Preparing nodes for the NVIDIA GPU Operator (NFD is a prerequisite)
 

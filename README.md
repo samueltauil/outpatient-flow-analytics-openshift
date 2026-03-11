@@ -146,13 +146,29 @@ etl_watermark (source_id PK, last_created_at, last_run_at, rows_transferred)
 | General       | 5     | Lap chole, Hernia repair, Breast lumpectomy       |
 | Cardiology    | 2     | Diagnostic cath, Cardioversion                    |
 
+## Cluster Provisioning
+
+Before deploying the application, the cluster needs four operators: **OpenShift GitOps (ArgoCD)**, **Node Feature Discovery**, **NVIDIA GPU Operator**, and **OpenShift Pipelines**. The recommended approach uses GitOps automation:
+
+```bash
+# Step 0 — Install ArgoCD operator
+bash .github/skills/openshift-gitops/scripts/install.sh
+
+# Step 1 — Bootstrap GPU infrastructure (NFD + GPU Operator + DCGM Dashboard)
+oc apply -f https://raw.githubusercontent.com/samueltauil/ocp-gpu-gitops/main/gitops/manifests/cluster/bootstrap/base/bigbang-app.yaml
+
+# Step 2 — Install OpenShift Pipelines via ArgoCD
+oc apply -f openshift/argocd/openshift-pipelines-app.yaml
+```
+
+📖 **Full guide with verification steps, timing, and troubleshooting:** [docs/cluster-provisioning.md](docs/cluster-provisioning.md)
+
 ## OpenShift Deployment
 
 ### Prerequisites
 
+- Cluster provisioned with all operators (see [Cluster Provisioning](#cluster-provisioning) above)
 - OpenShift Container Platform 4.21.x (verified on ARO 4.21.2)
-- OpenShift Virtualization operator (for RHEL VM scenarios)
-- NVIDIA GPU Operator + Node Feature Discovery (NFD) installed
 - H100 GPU worker node with taint `nvidia.com/gpu=:NoSchedule`
 - `oc` CLI authenticated to the cluster
 

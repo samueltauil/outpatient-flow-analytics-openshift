@@ -8,7 +8,7 @@ description: >
 compatibility: Requires OpenShift 4.14+ with cluster-admin access and oc CLI.
 ---
 
-# OpenShift Pipelines (Tekton) Operator
+# OpenShift Pipelines (Tekton) — Troubleshooting & Configuration
 
 ## When to use this skill
 

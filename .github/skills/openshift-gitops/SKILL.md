@@ -8,7 +8,7 @@ description: >
 compatibility: Requires OpenShift 4.14+ with cluster-admin access and oc CLI.
 ---
 
-# OpenShift GitOps (ArgoCD) — Install & Troubleshoot
+# OpenShift GitOps (ArgoCD) — Bootstrap & Troubleshoot
 
 ArgoCD is the **foundation** of the outpatient-flow-analytics deployment pipeline.
 This skill covers installing the operator (Step 0 of every bootstrap), then
