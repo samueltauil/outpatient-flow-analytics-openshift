@@ -4,6 +4,8 @@ kind: Job
 metadata:
   name: data-generator
   namespace: edge-collector
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
   labels:
     app: data-generator
     app.kubernetes.io/part-of: hls-demo
@@ -63,6 +65,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: generator-data-pvc
   namespace: edge-collector
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
   labels:
     app.kubernetes.io/part-of: hls-demo
 spec:

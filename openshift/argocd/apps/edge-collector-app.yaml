@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: hls-edge-collector
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  labels:
+    gitops.ownedBy: hls-app-of-apps
+spec:
+  destination:
+    namespace: edge-collector
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    path: openshift/apps/edge-collector
+    repoURL: https://github.com/samueltauil/outpatient-flow-analytics-openshift.git
+    targetRevision: main
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true

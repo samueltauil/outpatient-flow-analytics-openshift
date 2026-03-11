@@ -4,6 +4,8 @@ kind: Deployment
 metadata:
   name: central-postgres
   namespace: central-analytics
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
   labels:
     app: central-postgres
     app.kubernetes.io/part-of: hls-demo
@@ -90,6 +92,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: central-pgdata-pvc
   namespace: central-analytics
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
   labels:
     app.kubernetes.io/part-of: hls-demo
 spec:
@@ -104,6 +108,8 @@ kind: Service
 metadata:
   name: central-postgres
   namespace: central-analytics
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
   labels:
     app: central-postgres
     app.kubernetes.io/part-of: hls-demo

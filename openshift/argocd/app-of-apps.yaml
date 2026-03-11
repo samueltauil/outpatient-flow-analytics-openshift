@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: hls-app-of-apps
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+  labels:
+    gitops.ownedBy: default
+spec:
+  destination:
+    namespace: openshift-gitops
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    path: openshift/argocd/apps
+    repoURL: https://github.com/samueltauil/outpatient-flow-analytics-openshift.git
+    targetRevision: main
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true

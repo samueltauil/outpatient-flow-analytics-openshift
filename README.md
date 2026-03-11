@@ -159,6 +159,9 @@ oc apply -f https://raw.githubusercontent.com/samueltauil/ocp-gpu-gitops/main/gi
 
 # Step 2 — Install OpenShift Pipelines via ArgoCD
 oc apply -f openshift/argocd/openshift-pipelines-app.yaml
+
+# Step 3 — Deploy application stack via ArgoCD
+oc apply -f openshift/argocd/app-of-apps.yaml
 ```
 
 📖 **Full guide with verification steps, timing, and troubleshooting:** [docs/cluster-provisioning.md](docs/cluster-provisioning.md)

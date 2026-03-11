@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - secrets.yaml
+  - service-accounts.yaml
+  - ../../03-central-postgres.yaml
+  - ../../05-etl-cronjob.yaml
+  - ../../06-gpu-analytics-job.yaml
+  - ../../08-report-viewer.yaml
+  - db-init-job.yaml
+configMapGenerator:
+  - name: central-db-init
+    namespace: central-analytics
+    files:
+      - ../../../db/schema.sql
+      - ../../../db/seed.sql
+generatorOptions:
+  disableNameSuffixHash: true

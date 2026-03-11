@@ -3,15 +3,21 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: edge-collector
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
   labels:
     app.kubernetes.io/part-of: hls-demo
     tier: edge
+    argocd.argoproj.io/managed-by: openshift-gitops
 ---
 # Central Analytics Namespace
 apiVersion: v1
 kind: Namespace
 metadata:
   name: central-analytics
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
   labels:
     app.kubernetes.io/part-of: hls-demo
     tier: central
+    argocd.argoproj.io/managed-by: openshift-gitops

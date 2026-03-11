@@ -4,6 +4,8 @@ kind: CronJob
 metadata:
   name: etl-edge-to-central
   namespace: central-analytics
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
   labels:
     app: etl-job
     app.kubernetes.io/part-of: hls-demo

@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: edge-db-init
+  namespace: edge-collector
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: edge-db-init
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: db-init
+        image: registry.redhat.io/rhel9/postgresql-15:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          until pg_isready -h edge-postgres.edge-collector.svc.cluster.local -p 5432; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+          echo "Applying schema..."
+          PGPASSWORD="${POSTGRES_PASSWORD}" psql -h edge-postgres.edge-collector.svc.cluster.local \
+            -p 5432 -U "${POSTGRES_USER}" -d edge_collector -f /sql/schema.sql
+          echo "Applying seed data..."
+          PGPASSWORD="${POSTGRES_PASSWORD}" psql -h edge-postgres.edge-collector.svc.cluster.local \
+            -p 5432 -U "${POSTGRES_USER}" -d edge_collector -f /sql/seed.sql
+          echo "DB init complete."
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: edge-db-credentials
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: edge-db-credentials
+              key: POSTGRES_PASSWORD
+        volumeMounts:
+        - name: sql-scripts
+          mountPath: /sql
+      volumes:
+      - name: sql-scripts
+        configMap:
+          name: edge-db-init

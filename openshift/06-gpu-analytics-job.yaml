@@ -5,6 +5,8 @@ kind: Job
 metadata:
   name: gpu-analytics
   namespace: central-analytics
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
   labels:
     app: gpu-analytics
     app.kubernetes.io/part-of: hls-demo
@@ -81,6 +83,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: analytics-output-pvc
   namespace: central-analytics
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
   labels:
     app.kubernetes.io/part-of: hls-demo
 spec:

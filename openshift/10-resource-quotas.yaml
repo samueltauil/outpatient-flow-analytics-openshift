@@ -6,6 +6,8 @@ kind: ResourceQuota
 metadata:
   name: edge-collector-quota
   namespace: edge-collector
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
   labels:
     app.kubernetes.io/part-of: hls-demo
 spec:
@@ -22,6 +24,8 @@ kind: LimitRange
 metadata:
   name: edge-collector-limits
   namespace: edge-collector
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
   labels:
     app.kubernetes.io/part-of: hls-demo
 spec:
@@ -42,6 +46,8 @@ kind: ResourceQuota
 metadata:
   name: central-analytics-quota
   namespace: central-analytics
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
   labels:
     app.kubernetes.io/part-of: hls-demo
 spec:
@@ -58,6 +64,8 @@ kind: LimitRange
 metadata:
   name: central-analytics-limits
   namespace: central-analytics
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
   labels:
     app.kubernetes.io/part-of: hls-demo
 spec:

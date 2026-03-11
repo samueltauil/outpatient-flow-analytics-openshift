@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: hls-central-analytics
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  labels:
+    gitops.ownedBy: hls-app-of-apps
+spec:
+  destination:
+    namespace: central-analytics
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    path: openshift/apps/central-analytics
+    repoURL: https://github.com/samueltauil/outpatient-flow-analytics-openshift.git
+    targetRevision: main
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true

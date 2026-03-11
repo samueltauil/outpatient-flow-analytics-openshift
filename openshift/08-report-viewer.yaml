@@ -5,6 +5,8 @@ kind: Deployment
 metadata:
   name: report-viewer
   namespace: central-analytics
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
   labels:
     app: report-viewer
     app.kubernetes.io/part-of: hls-demo
@@ -68,6 +70,8 @@ kind: Service
 metadata:
   name: report-viewer
   namespace: central-analytics
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
   labels:
     app: report-viewer
     app.kubernetes.io/part-of: hls-demo
@@ -84,6 +88,8 @@ kind: Route
 metadata:
   name: report-viewer
   namespace: central-analytics
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
   labels:
     app: report-viewer
     app.kubernetes.io/part-of: hls-demo

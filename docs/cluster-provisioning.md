@@ -3,7 +3,7 @@
 This guide walks through provisioning an OpenShift cluster for the
 **outpatient-flow-analytics** project. The process follows a 3-step GitOps
 bootstrap that installs ArgoCD, GPU infrastructure, and Tekton pipelines,
-then deploys the application stack.
+then deploys the application stack via an ArgoCD app-of-apps.
 
 ---
 
@@ -99,9 +99,58 @@ bash .github/skills/openshift-pipelines/scripts/verify.sh
 
 ---
 
-## Step 3 — Deploy Application Stack
+## Step 3 — Deploy Application Stack via ArgoCD
 
-Once all operators are healthy, deploy the full application stack:
+After all operators are installed and healthy, deploy the application:
+
+```bash
+# Update placeholder secrets in openshift/01-secrets.yaml with real passwords before deploying
+
+# Deploy application stack via ArgoCD app-of-apps
+oc apply -f openshift/argocd/app-of-apps.yaml
+```
+
+This creates an app-of-apps that deploys 4 ArgoCD Applications in order:
+
+| Application | Sync Wave | Components |
+|------------|-----------|------------|
+| `hls-shared-infra` | 1 | Namespaces, SCC RBAC, network policies, resource quotas |
+| `hls-edge-collector` | 2 | Edge secrets, service accounts, PostgreSQL + DB init, data generator |
+| `hls-central-analytics` | 3 | Central secrets, service accounts, PostgreSQL + DB init, ETL, GPU analytics, report viewer |
+| `hls-tekton-pipeline` | 4 | Pipeline service account, Tekton tasks, pipeline |
+
+Monitor progress:
+```bash
+oc get applications -n openshift-gitops
+oc get pods -n edge-collector -w
+oc get pods -n central-analytics -w
+```
+
+Verify databases initialized:
+```bash
+oc exec deploy/edge-postgres -n edge-collector -- psql -U postgres -d edge_collector -c '\dt'
+oc exec deploy/central-postgres -n central-analytics -- psql -U postgres -d central_analytics -c '\dt'
+```
+
+### Triggering the Analytics Pipeline
+
+PipelineRun is intentionally excluded from ArgoCD (it uses `generateName` and
+would re-trigger on every sync). Trigger manually:
+
+```bash
+oc create -f openshift/tekton/05-pipelinerun.yaml -n central-analytics
+```
+
+Monitor pipeline execution:
+```bash
+oc get pipelineruns -n central-analytics -w
+```
+
+---
+
+## Alternative: Deploy via deploy.sh (Non-GitOps Fallback)
+
+If GitOps is not desired, deploy the full application stack directly:
 
 ```bash
 ./deploy.sh
@@ -196,7 +245,7 @@ bash .github/skills/nvidia-gpu/scripts/install.sh
 > **Dependency order:** ArgoCD → Pipelines *(independent)* → NFD → GPU Operator
 
 After all operators are installed, deploy the application stack with
-`./deploy.sh` as described in Step 3.
+`./deploy.sh` as described in the [Alternative: Deploy via deploy.sh](#alternative-deploy-via-deploysh-non-gitops-fallback) section.
 
 ---
 

@@ -5,6 +5,8 @@ kind: Deployment
 metadata:
   name: edge-postgres
   namespace: edge-collector
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
   labels:
     app: edge-postgres
     app.kubernetes.io/part-of: hls-demo
@@ -94,6 +96,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: edge-pgdata-pvc
   namespace: edge-collector
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
   labels:
     app.kubernetes.io/part-of: hls-demo
 spec:
@@ -108,6 +112,8 @@ kind: Service
 metadata:
   name: edge-postgres
   namespace: edge-collector
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
   labels:
     app: edge-postgres
     app.kubernetes.io/part-of: hls-demo

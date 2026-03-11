@@ -4,6 +4,8 @@ kind: NetworkPolicy
 metadata:
   name: allow-etl-to-edge
   namespace: edge-collector
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
   labels:
     app.kubernetes.io/part-of: hls-demo
 spec:
@@ -33,6 +35,8 @@ kind: NetworkPolicy
 metadata:
   name: central-postgres-internal
   namespace: central-analytics
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
   labels:
     app.kubernetes.io/part-of: hls-demo
 spec:

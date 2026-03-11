@@ -10,6 +10,8 @@ kind: Pipeline
 metadata:
   name: outpatient-analytics
   namespace: central-analytics
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
   labels:
     app.kubernetes.io/part-of: hls-demo
 spec:

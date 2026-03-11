@@ -1,0 +1,38 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: use-nonroot-v2-scc
+rules:
+- apiGroups: ['security.openshift.io']
+  resources: ['securitycontextconstraints']
+  resourceNames: ['nonroot-v2']
+  verbs: ['use']
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: gpu-analytics-sa-nonroot-v2
+  namespace: central-analytics
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: use-nonroot-v2-scc
+subjects:
+- kind: ServiceAccount
+  name: gpu-analytics-sa
+  namespace: central-analytics
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pipeline-sa-nonroot-v2
+  namespace: central-analytics
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: use-nonroot-v2-scc
+subjects:
+- kind: ServiceAccount
+  name: pipeline-sa
+  namespace: central-analytics

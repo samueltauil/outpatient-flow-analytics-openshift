@@ -9,6 +9,8 @@ kind: Task
 metadata:
   name: generate-and-load
   namespace: central-analytics
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
   labels:
     app.kubernetes.io/part-of: hls-demo
 spec:
@@ -130,6 +132,8 @@ kind: Task
 metadata:
   name: run-etl
   namespace: central-analytics
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
   labels:
     app.kubernetes.io/part-of: hls-demo
 spec:
@@ -181,6 +185,8 @@ kind: Task
 metadata:
   name: run-gpu-analytics
   namespace: central-analytics
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
   labels:
     app.kubernetes.io/part-of: hls-demo
 spec:
