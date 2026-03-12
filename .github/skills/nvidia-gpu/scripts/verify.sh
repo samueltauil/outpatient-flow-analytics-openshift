@@ -33,13 +33,13 @@ check "ClusterPolicy State" \
 echo ""
 echo "--- Component Pods ---"
 
-for COMPONENT in nvidia-driver-daemonset nvidia-device-plugin-daemonset nvidia-dcgm-exporter nvidia-operator-validator; do
-  COUNT=$(oc get pods -n nvidia-gpu-operator -l app=$COMPONENT --no-headers 2>/dev/null | grep -c Running || echo "0")
+for COMPONENT in nvidia-device-plugin-daemonset nvidia-dcgm-exporter nvidia-operator-validator; do
+  COUNT=$(oc get pods -n nvidia-gpu-operator -l app="$COMPONENT" --no-headers 2>/dev/null | grep -c Running) || COUNT=0
   if [ "$COUNT" -gt 0 ]; then
     echo "✓ $COMPONENT: $COUNT running"
     PASS=$((PASS + 1))
   else
-    TOTAL=$(oc get pods -n nvidia-gpu-operator -l app=$COMPONENT --no-headers 2>/dev/null | wc -l)
+    TOTAL=$(oc get pods -n nvidia-gpu-operator -l app="$COMPONENT" --no-headers 2>/dev/null | wc -l) || TOTAL=0
     if [ "$TOTAL" -gt 0 ]; then
       echo "✗ $COMPONENT: 0 running ($TOTAL total)"
       FAIL=$((FAIL + 1))
@@ -48,6 +48,21 @@ for COMPONENT in nvidia-driver-daemonset nvidia-device-plugin-daemonset nvidia-d
     fi
   fi
 done
+
+# Driver daemonset uses a different label
+DRIVER_COUNT=$(oc get pods -n nvidia-gpu-operator -l openshift.driver-toolkit=true --no-headers 2>/dev/null | grep -c Running) || DRIVER_COUNT=0
+if [ "$DRIVER_COUNT" -gt 0 ]; then
+  echo "✓ nvidia-driver-daemonset: $DRIVER_COUNT running"
+  PASS=$((PASS + 1))
+else
+  DRIVER_TOTAL=$(oc get pods -n nvidia-gpu-operator -l openshift.driver-toolkit=true --no-headers 2>/dev/null | wc -l) || DRIVER_TOTAL=0
+  if [ "$DRIVER_TOTAL" -gt 0 ]; then
+    echo "✗ nvidia-driver-daemonset: 0 running ($DRIVER_TOTAL total)"
+    FAIL=$((FAIL + 1))
+  else
+    echo "· nvidia-driver-daemonset: not deployed (may be expected if no GPU nodes)"
+  fi
+fi
 
 # GPU nodes
 echo ""
@@ -99,14 +114,27 @@ else
   echo "· No DCGM exporter pod found"
 fi
 
-# Project-specific SCC check
+# Project-specific SCC check (RBAC-based or legacy SCC users field)
 echo ""
 echo "--- Project SCC (optional) ---"
 if oc get namespace central-analytics &>/dev/null; then
   SCC_USERS=$(oc get scc nonroot-v2 -o jsonpath='{.users}' 2>/dev/null || echo "")
   for SA in gpu-analytics-sa pipeline-sa; do
     if echo "$SCC_USERS" | grep -q "$SA"; then
-      echo "✓ $SA has nonroot-v2 SCC"
+      echo "✓ $SA has nonroot-v2 SCC (direct)"
+    elif oc get rolebinding -n central-analytics -o json 2>/dev/null | \
+         python3 -c "
+import json,sys
+data=json.load(sys.stdin)
+sa='$SA'
+for rb in data.get('items',[]):
+  role=rb.get('roleRef',{}).get('name','')
+  if 'nonroot' not in role: continue
+  for s in rb.get('subjects',[]):
+    if s.get('name')==sa:
+      print('yes'); sys.exit(0)
+print('no')" 2>/dev/null | grep -q "yes"; then
+      echo "✓ $SA has nonroot-v2 SCC (via RBAC)"
     else
       echo "⚠ $SA missing nonroot-v2 — run: oc adm policy add-scc-to-user nonroot-v2 -z $SA -n central-analytics"
     fi

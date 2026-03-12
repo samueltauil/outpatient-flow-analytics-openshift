@@ -28,10 +28,17 @@ bash .github/skills/openshift-gitops/scripts/install.sh
 bash .github/skills/openshift-gitops/scripts/verify.sh
 ```
 
-The install script creates an OLM Subscription for
-`openshift-gitops-operator` from the `redhat-operators` catalog, waits for
-the CSV to reach the **Succeeded** phase, and confirms the ArgoCD server
-deployment is **Available**.
+The install script:
+
+1. Creates an OLM Subscription for `openshift-gitops-operator` from the
+   `redhat-operators` catalog
+2. Waits for the CSV to reach the **Succeeded** phase
+3. Confirms the ArgoCD server deployment is **Available**
+4. **Grants `cluster-admin` to the ArgoCD application controller** — required
+   for managing CRDs like `NodeFeatureDiscovery` and `ClusterPolicy`
+5. **Configures `kustomizeBuildOptions`** with
+   `--load-restrictor LoadRestrictionsNone` — required because the app
+   kustomizations reference shared manifests via `../../` paths
 
 > **Time:** ~5–10 minutes.
 
@@ -104,7 +111,13 @@ bash .github/skills/openshift-pipelines/scripts/verify.sh
 After all operators are installed and healthy, deploy the application:
 
 ```bash
-# Update placeholder secrets in openshift/01-secrets.yaml with real passwords before deploying
+# Create namespaces first and apply secrets with real passwords
+oc apply -f openshift/00-namespaces.yaml
+
+# Generate secure passwords and apply secrets (or update openshift/01-secrets.yaml)
+EDGE_PW=$(python3 -c "import secrets; print(secrets.token_urlsafe(24))")
+CENTRAL_PW=$(python3 -c "import secrets; print(secrets.token_urlsafe(24))")
+# ... apply secrets with generated passwords (see deploy.sh for automated generation)
 
 # Deploy application stack via ArgoCD app-of-apps
 oc apply -f openshift/argocd/app-of-apps.yaml
@@ -118,6 +131,11 @@ This creates an app-of-apps that deploys 4 ArgoCD Applications in order:
 | `hls-edge-collector` | 2 | Edge secrets, service accounts, PostgreSQL + DB init, data generator |
 | `hls-central-analytics` | 3 | Central secrets, service accounts, PostgreSQL + DB init, ETL, GPU analytics, report viewer |
 | `hls-tekton-pipeline` | 4 | Pipeline service account, Tekton tasks, pipeline |
+
+> **Note:** The GPU analytics job has `backoffLimit: 6` to tolerate the
+> brief delay between SCC RBAC propagation and pod scheduling. The first
+> few pod creation attempts may fail with SCC errors — this is expected
+> and the job controller will retry with exponential backoff.
 
 Monitor progress:
 ```bash

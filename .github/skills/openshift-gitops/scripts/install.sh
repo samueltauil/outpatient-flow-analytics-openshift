@@ -56,6 +56,32 @@ for i in $(seq 1 60); do
   sleep 5
 done
 
+# Grant ArgoCD application controller cluster-admin so it can manage
+# CRDs like NodeFeatureDiscovery and ClusterPolicy across namespaces.
+APP_CONTROLLER_SA="system:serviceaccount:openshift-gitops:openshift-gitops-argocd-application-controller"
+if oc get clusterrolebinding openshift-gitops-argocd-controller-cluster-admin &>/dev/null; then
+  echo "✓ App controller cluster-admin already granted"
+else
+  echo "→ Granting cluster-admin to ArgoCD application controller..."
+  oc create clusterrolebinding openshift-gitops-argocd-controller-cluster-admin \
+    --clusterrole=cluster-admin \
+    --serviceaccount=openshift-gitops:openshift-gitops-argocd-application-controller
+  echo "✓ App controller cluster-admin granted"
+fi
+
+# Enable kustomize cross-directory references (required by app kustomizations
+# that reference shared manifests via ../../ paths).
+CURRENT_OPTS=$(oc get argocd openshift-gitops -n openshift-gitops \
+  -o jsonpath='{.spec.kustomizeBuildOptions}' 2>/dev/null || echo "")
+if echo "$CURRENT_OPTS" | grep -q "LoadRestrictionsNone"; then
+  echo "✓ Kustomize build options already configured"
+else
+  echo "→ Configuring kustomize --load-restrictor LoadRestrictionsNone..."
+  oc patch argocd openshift-gitops -n openshift-gitops --type merge \
+    -p '{"spec":{"kustomizeBuildOptions":"--load-restrictor LoadRestrictionsNone"}}'
+  echo "✓ Kustomize build options configured"
+fi
+
 # Print access info
 ROUTE=$(oc get route openshift-gitops-server -n openshift-gitops \
   -o jsonpath='{.spec.host}' 2>/dev/null || echo "route not found")

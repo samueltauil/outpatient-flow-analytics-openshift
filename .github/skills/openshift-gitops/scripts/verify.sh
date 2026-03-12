@@ -41,6 +41,41 @@ check "Application Controller" \
 check "Repo Server" \
   "oc get pods -n openshift-gitops -l app.kubernetes.io/name=openshift-gitops-repo-server -o jsonpath='{.items[0].status.phase}'"
 
+# ArgoCD configuration checks
+echo ""
+echo "--- Configuration ---"
+
+KUSTOMIZE_OPTS=$(oc get argocd openshift-gitops -n openshift-gitops \
+  -o jsonpath='{.spec.kustomizeBuildOptions}' 2>/dev/null || echo "")
+if echo "$KUSTOMIZE_OPTS" | grep -q "LoadRestrictionsNone"; then
+  echo "✓ Kustomize build options: $KUSTOMIZE_OPTS"
+  PASS=$((PASS + 1))
+else
+  echo "✗ Kustomize build options not set — cross-directory refs will fail"
+  echo "  Fix: oc patch argocd openshift-gitops -n openshift-gitops --type merge -p '{\"spec\":{\"kustomizeBuildOptions\":\"--load-restrictor LoadRestrictionsNone\"}}'"
+  FAIL=$((FAIL + 1))
+fi
+
+CTRL_SA="system:serviceaccount:openshift-gitops:openshift-gitops-argocd-application-controller"
+HAS_ADMIN=$(oc get clusterrolebindings -o json 2>/dev/null | \
+  python3 -c "
+import json,sys
+data=json.load(sys.stdin)
+for i in data['items']:
+  if i.get('roleRef',{}).get('name')!='cluster-admin': continue
+  for s in i.get('subjects',[]):
+    if s.get('kind')=='ServiceAccount' and s.get('name')=='openshift-gitops-argocd-application-controller' and s.get('namespace')=='openshift-gitops':
+      print('yes'); sys.exit(0)
+print('no')" 2>/dev/null || echo "no")
+if [ "$HAS_ADMIN" = "yes" ]; then
+  echo "✓ App controller has cluster-admin"
+  PASS=$((PASS + 1))
+else
+  echo "✗ App controller missing cluster-admin — CRD sync will fail"
+  echo "  Fix: oc create clusterrolebinding openshift-gitops-argocd-controller-cluster-admin --clusterrole=cluster-admin --serviceaccount=openshift-gitops:openshift-gitops-argocd-application-controller"
+  FAIL=$((FAIL + 1))
+fi
+
 # Check for any Applications
 echo ""
 echo "--- Applications ---"
