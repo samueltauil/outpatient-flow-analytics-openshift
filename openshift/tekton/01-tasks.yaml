@@ -191,6 +191,7 @@ metadata:
     app.kubernetes.io/part-of: hls-demo
 spec:
   stepTemplate:
+    computeResources: {}
     securityContext:
       runAsUser: 1001
       runAsGroup: 1001
@@ -230,7 +231,6 @@ spec:
         memory: "32Gi"
         cpu: "8"
         nvidia.com/gpu: "1"
-  sidecars: []
   volumes:
   - name: analytics-output
     persistentVolumeClaim:

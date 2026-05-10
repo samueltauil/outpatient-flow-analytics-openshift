@@ -28,6 +28,7 @@ spec:
   # Stage 1: Generate synthetic data AND load into edge DB
   - name: generate-and-load
     taskRef:
+      kind: Task
       name: generate-and-load
     params:
     - name: start-date
@@ -39,10 +40,12 @@ spec:
   - name: etl
     runAfter: ["generate-and-load"]
     taskRef:
+      kind: Task
       name: run-etl
 
   # Stage 3: GPU analytics on H100
   - name: gpu-analytics
     runAfter: ["etl"]
     taskRef:
+      kind: Task
       name: run-gpu-analytics
